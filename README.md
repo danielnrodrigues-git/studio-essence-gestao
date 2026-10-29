@@ -18,3 +18,15 @@
 5. Não armazenar segredos nem dados pessoais de clientes no Git.
 
 **Status:** Projeto Vercel existente ainda sem vínculo Git. Nenhum deploy de produção realizado a partir deste repositório.
+
+## Backlog — próximo hotfix financeiro
+
+**Conciliação de comissões geradas vs. fechamentos pagos (sem alterar histórico financeiro automaticamente)**
+
+- Comparar o agregado do dashboard e o detalhamento do card com os fechamentos e comissões por atendimento.
+- Priorizar fechamento pago como fonte de referência histórica; comissões abertas seguem o cálculo atual.
+- Preservar auditoria e eventuais ajustes intencionais, evitando duplicidade e reprocessamento de caixa.
+- Divergências encontradas em 2026-10-29, por profissional: Victoria +R$ 22,00 (63 vs. 85), Daniele +R$ 37,50, Nana -R$ 24,19, Pamela -R$ 8,50 em 6 itens; sinal = fechamento menos atendimento.
+- Validar os totais de dashboard e reconciliação antes de implantar uma correção financeira.
+
+**HF4 — Dashboard:** gráfico Receitas × Saídas em visão mensal janeiro–dezembro, com ano próprio, sem depender do filtro De/Até do dashboard. Mudança restrita à apresentação do gráfico.
