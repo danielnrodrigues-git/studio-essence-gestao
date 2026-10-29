@@ -2,18 +2,19 @@
 
 ## Baseline recuperada em 2026-10-29
 
-- Versão identificada na página: **v1.8.1 HF2**.
-- Fonte: https://studio-essence-gestao.vercel.app/
-- `index.html`: HTML integral retornado pela aplicação publicada (1.042.641 caracteres).
-- Não é backup integral: ainda faltam arquivos binários, APIs, variáveis de ambiente e dados do banco.
-- Favicon referenciado: `/favicon-marsala.png?v=20261029c`. O arquivo binário ainda requer recuperação íntegra antes do deploy.
+- Versão visível: **v1.8.1 HF2**.
+- Fonte HTML: https://studio-essence-gestao.vercel.app/ (1.042.641 caracteres).
+- `index.html`: conteúdo integral da página servida em produção.
+- `favicon-marsala.png`: imagem PNG original (32 × 32 px) recuperada do deployment da Vercel e preservada **sem edição**.
+- Esses arquivos estão no GitHub; o favicon ainda tem correção visual pendente.
+- Não é backup integral: infraestrutura, Edge Functions/APIs, banco, parâmetros e variáveis de ambiente requerem documentação e recuperação próprias.
 
-## Processo
+## Governança
 
-1. Versionar alterações no GitHub antes de implantar.
-2. Inventariar dependências, arquivos estáticos e configurações.
-3. Publicar em preview e testar antes de promover à produção.
-4. Preservar histórico de commits e rollback.
-5. Nunca versionar credenciais, dados de clientes ou backups do banco.
+1. Manter a baseline e identificar commits por alteração/hotfix.
+2. Não habilitar deploy automático antes de testar estrutura e configuração do projeto.
+3. Testar alterações em preview antes de publicar.
+4. Preservar capacidade de rollback.
+5. Não armazenar segredos nem dados pessoais de clientes no Git.
 
-**Status:** a Vercel ainda não está vinculada a este repositório, e nenhum deploy foi realizado durante a recuperação.
+**Status:** Projeto Vercel existente ainda sem vínculo Git. Nenhum deploy de produção realizado a partir deste repositório.
