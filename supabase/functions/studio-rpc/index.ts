@@ -1042,12 +1042,12 @@ async function saveRevenueV181(user:any,payload:any){
   const revenues:any[]=[],parcels:any[]=[],cash:any[]=[],audit:any[]=[];
   for(let occ=0;occ<recurCount;occ++){
     const id=uidV181("REC"),revenue:any={id,descricao:description+(recurring?" ["+String(occ+1)+"/"+String(recurCount)+"]":""),cliente_id:party.client?.id||"",cliente_nome:party.clientName,
-      data_competencia:addMonthsRevenueV181(competence,occ),categoria_receita_id:cat.id,subcategoria_receita_id:sub?.id||"",categoria:cat.nome,subcategoria:sub?.nome||"",natureza,
+      data_competencia:addMonthsRevenueV181(competence,occ),categoria_receita_id:cat.id,subcategoria_receita_id:sub?.id||"",categoria:cat.nome,subcategoria:sub?.nome||"",natureza:nature,
       valor_total:total,forma_id:party.forma?.id||"",forma_pagamento:party.forma?.nome||"Não informado",qtd_parcelas:qtd,data_primeiro_recebimento:addMonthsRevenueV181(firstDue,occ),
       status:initial,recorrente:recurring,recorrencia_meses:recurCount,observacoes:String(payload.observacoes||""),origem:"MANUAL",usuario_id:user.id,usuario_nome:user.nome,
       criado_em:nowIsoV181(),atualizado_em:nowIsoV181(),editado_por:"",excluido:false};
     const prep=await createRevenueParcelsPreparedV181(revenue,initial);revenues.push(revenue);parcels.push(...prep.parcels);cash.push(...prep.cash);
-    audit.push(revenueAuditRowV181(user,"CRIAR","RECEITA",id,{descricao:revenue.descricao,valor:total,status:initial,natureza,parcelas:qtd}));
+    audit.push(revenueAuditRowV181(user,"CRIAR","RECEITA",id,{descricao:revenue.descricao,valor:total,status:initial,natureza:nature,parcelas:qtd}));
   }
   return await revenueTxV181("CREATE",{revenues,parcels,cash,audit},user);
 }
