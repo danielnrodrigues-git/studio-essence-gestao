@@ -30,3 +30,10 @@
 - Validar os totais de dashboard e reconciliação antes de implantar uma correção financeira.
 
 **HF4 — Dashboard:** gráfico Receitas × Saídas em visão mensal janeiro–dezembro, com ano próprio, sem depender do filtro De/Até do dashboard. Mudança restrita à apresentação do gráfico.
+
+## HF5 — comissões reconhecidas no dashboard
+
+- API apiDashboardV180 e apiCommissionGeneratedDetailV181 usarão comissoes_itens.valor_comissao dos fechamentos PAGO, pareados por ID do item, como referência histórica; itens sem fechamento pago manterão o valor_comissao da origem.
+- Filtrar serviços/vendas ativos no período solicitado e não somar fechamentos novamente; evitar dupla contagem.
+- Não modificar tabelas, fechamentos, vales, movimentos de caixa nem status financeiros.
+- Validar divergências de outubro (Victoria, Daniele, Nana, Pamela) e igualdade entre card e composição.
