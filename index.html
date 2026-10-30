@@ -985,5 +985,39 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   };
 })();
 </script>
+<script id="expenseCategoryHF12">
+(function(){
+  // Preserve selected categories when lookups are refreshed.
+  if(typeof window.populateExpenseCategories!=="function"||typeof window.updateExpenseSubcategories!=="function")return;
+  window.updateExpenseSubcategories=function(kind,selected){
+    const edit=kind==="edit",prefix=edit?"editExp":"exp";
+    const cat=document.getElementById(prefix+"Cat"),sub=document.getElementById(prefix+"Sub"),field=document.getElementById(prefix+"SubField");
+    if(!cat||!sub||!field)return;
+    const all=(edit&&typeof isAdmin==="function"&&isAdmin()&&STATE.data?.allCategories?.length?STATE.data.allCategories:STATE.data?.categories)||[];
+    const names=[...new Set(all.filter(x=>x.ativo!==false&&x.categoria===cat.value&&x.subcategoria).map(x=>x.subcategoria))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+    const wanted=selected!==undefined?selected:sub.value;
+    const existing=[...sub.options].map(o=>o.value).filter(Boolean);
+    if(existing.join("\\u0000")!==names.join("\\u0000")){
+      sub.innerHTML='<option value="">Selecione...</option>'+names.map(x=>'<option value="'+escapeHtml(x)+'">'+escapeHtml(x)+'</option>').join("");
+    }
+    field.classList.toggle("hidden",names.length===0);
+    sub.value=names.includes(wanted)?wanted:"";
+  };
+  window.populateExpenseCategories=function(){
+    [["expCat","new"],["editExpCat","edit"]].forEach(([id,kind])=>{
+      const el=document.getElementById(id);if(!el)return;
+      const source=(kind==="edit"&&typeof isAdmin==="function"&&isAdmin()&&STATE.data?.allCategories?.length?STATE.data.allCategories:STATE.data?.categories)||[];
+      const names=[...new Set(source.filter(x=>x.ativo!==false&&x.categoria).map(x=>x.categoria))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+      const chosen=el.value;
+      const current=[...el.options].map(o=>o.value).filter(Boolean);
+      if(current.join("\\u0000")!==names.join("\\u0000")){
+        el.innerHTML='<option value="">Selecione...</option>'+names.map(x=>'<option value="'+escapeHtml(x)+'">'+escapeHtml(x)+'</option>').join("");
+      }
+      if(names.includes(chosen))el.value=chosen;
+      window.updateExpenseSubcategories(kind);
+    });
+  };
+})();
+</script>
 </body>
 </html>
