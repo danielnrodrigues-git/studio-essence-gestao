@@ -525,7 +525,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
 <button class="btn primary full" id="activateBtn" type="button">Ativar acesso e entrar</button>
 <button class="btn soft full" id="activationBackBtn" type="button" style="margin-top:10px">Voltar ao login</button>
 </div>
-<div class="error" id="loginError"></div><div class="tiny muted" style="text-align:center;margin-top:18px">Studio Essence Gestão · UI <span id="loginVersionText">v1.8.1 HF2</span> · <span id="jsState">iniciando...</span></div>
+<div class="error" id="loginError"></div><div class="tiny muted" style="text-align:center;margin-top:18px">Studio Essence Gestão · UI <span id="loginVersionText">v1.8.1 HF12</span> · <span id="jsState">iniciando...</span></div>
 </div></div>
 <script>
 (function(){
@@ -733,7 +733,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
 <div class="side-user"><strong id="sideUser"></strong><br/><span id="sideRole"></span><br/><button class="side-link" type="button" onclick="openOwnPinModal()">Alterar senha de acesso</button><button class="side-logout" type="button" onclick="logout()"><span>↪</span> Sair</button></div>
 </aside>
 <main>
-<header class="official-topbar"><div class="top-left"><button class="btn soft small hamb" onclick="toggleMenu()">☰</button><div class="avatar-initial" id="topAvatarInitial">SE</div><div class="welcome-copy"><div class="top-greeting" id="topGreeting">Olá!</div><div class="top-subtitle">Que bom ver você por aqui. Vamos fazer hoje um grande dia!</div><h1 id="pageTitle" class="sr-only">Visão geral</h1></div></div><div class="top-right"><span class="system-version-badge" id="systemVersionBadge">v1.8.1</span><button class="icon-only" type="button" title="Notificações" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span class="notif-dot"></span></button><div class="global-search" id="globalSearchBox"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="globalSearchInput" aria-label="Busca geral" autocomplete="off" placeholder="Buscar em todo o sistema..."/><div class="global-search-results hidden" id="globalSearchResults"></div></div><span class="tiny muted session-compact" id="topSessionInfo"></span><button class="btn soft small top-refresh" onclick="manualRefreshData()">⟳ Atualizar dados</button></div></header>
+<header class="official-topbar"><div class="top-left"><button class="btn soft small hamb" onclick="toggleMenu()">☰</button><div class="avatar-initial" id="topAvatarInitial">SE</div><div class="welcome-copy"><div class="top-greeting" id="topGreeting">Olá!</div><div class="top-subtitle">Que bom ver você por aqui. Vamos fazer hoje um grande dia!</div><h1 id="pageTitle" class="sr-only">Visão geral</h1></div></div><div class="top-right"><span class="system-version-badge" id="systemVersionBadge">v1.8.1 HF12</span><button class="icon-only" type="button" title="Notificações" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span class="notif-dot"></span></button><div class="global-search" id="globalSearchBox"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="globalSearchInput" aria-label="Busca geral" autocomplete="off" placeholder="Buscar em todo o sistema..."/><div class="global-search-results hidden" id="globalSearchResults"></div></div><span class="tiny muted session-compact" id="topSessionInfo"></span><button class="btn soft small top-refresh" onclick="manualRefreshData()">⟳ Atualizar dados</button></div></header>
 <div class="content">
 <section class="section active" id="section-dashboard">
 <div class="dashboard-heading"><div><h2>Visão geral</h2><p>Acompanhe os principais indicadores do Studio.</p></div></div>
@@ -1019,5 +1019,6 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   };
 })();
 </script>
+<script id="versionDisplayHF12">(function(){function sync(){var version='v1.8.1 HF12';['systemVersionBadge','loginVersionText'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=version;});}sync();document.addEventListener('DOMContentLoaded',sync);})();</script>
 </body>
 </html>
