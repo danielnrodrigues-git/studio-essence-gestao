@@ -672,6 +672,27 @@ body{background:#f8f1e5!important;color:#173629}
 }
 #appView .v2-role-badge{color:#fff!important;background:#151515!important}
 </style>
+<style id="studio-v2-kpi-compact">
+/* V2 staging: one-line monthly comparisons, compact and readable. */
+#appView #adminKpis .v2-kpi-comparison{
+  display:block!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  max-width:100%!important;
+  font-size:clamp(9px,.78vw,11px)!important;
+  line-height:1.3!important;
+  letter-spacing:-.025em!important;
+  margin-top:5px!important;
+  padding-top:5px!important;
+}
+@media(max-width:1300px){
+  #appView #adminKpis .v2-kpi-comparison{font-size:10px!important}
+}
+@media(max-width:620px){
+  #appView #adminKpis .v2-kpi-comparison{font-size:10px!important}
+}
+</style>
 </head>
 <body>
 <div class="global-busy hidden" id="globalBusy" role="status" aria-live="polite" aria-hidden="true"><div class="global-busy-card-v152"><span class="busy-spinner"></span><span id="globalBusyText">Processando...</span><small>Aguarde a conclusão antes de continuar.</small></div></div>
