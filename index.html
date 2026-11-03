@@ -1262,7 +1262,10 @@ body{background:#f8f1e5!important;color:#173629}
       if(!child){child=document.createElement("div");child.className="v2-kpi-comparison";card.appendChild(child);}
       const v=pct(current[field],previous[field],lower);
       child.className="v2-kpi-comparison "+v.tone;
-      child.textContent=v.label+" \u00b7 vs mes anterior (mesmos dias)";
+      const meses=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const mes=meses[Number(range.start.slice(5,7))-1]||"";
+      const ano=range.start.slice(2,4);
+      child.textContent=v.label+" vs. "+mes+"/"+ano;
       child.title="Periodo de comparacao: "+range.start+" ate "+range.end;
     });
   }
