@@ -189,6 +189,203 @@ if(page==='expenses'){await loadMobileExpenses();return;}
 if(page==='accounts'){await loadMobileFinance('accounts');return;}
 }catch(e){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(e.message)+'</p>'}finally{status('')}}
 
+
+let expenseReference=null,expenseAccounts=[],expenseTab='list',expenseEdit=null,expenseRows=[],expenseLoading=false;
+const expenseG=id=>String(document.getElementById(id)?.value??'').trim();
+const expenseDate=()=>dates().end;
+const expenseCardMethod=v=>['credito','crédito','cartao socio(a)','cartão sócio(a)','cartao socio','cartão socio'].includes(String(v||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase())||['Crédito','Cartão Sócio(a)'].includes(v);
+function expenseMoney(id){const raw=expenseG(id).replace(/R\$\s*/g,'').replace(/\s/g,'');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)}
+function expenseField(id,title,type='text',value='',attrs=''){
+ return '<div class="field"><label for="'+id+'">'+escapeText(title)+'</label><input id="'+id+'" type="'+type+'" value="'+escapeText(value)+'" '+attrs+'></div>';
+}
+function expenseSelect(id,title,choices,value='',extra=''){
+ const entries=choices.map(x=>typeof x==='string'?{value:x,label:x}:x);
+ return '<div class="field"><label for="'+id+'">'+escapeText(title)+'</label><select id="'+id+'" '+extra+'>'+entries.map(x=>'<option value="'+escapeText(x.value)+'" '+(String(x.value)===String(value)?'selected':'')+'>'+escapeText(x.label)+'</option>').join('')+'</select></div>';
+}
+function expenseCategories(){return [...new Set((expenseReference?.categories||[]).filter(c=>c.tipo==='DESPESA'&&c.ativo).map(x=>x.categoria))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'))}
+function expenseSubcategories(cat){return [...new Set((expenseReference?.categories||[]).filter(x=>x.tipo==='DESPESA'&&x.ativo&&x.categoria===cat&&x.subcategoria).map(x=>x.subcategoria))]}
+function expenseMethods(){
+ const actual=(expenseReference?.paymentMethods||[]).map(x=>x.nome).filter(Boolean);
+ const preferred=['Crédito','Cartão Sócio(a)','Pix','Dinheiro','Débito','Boleto'];
+ return [...new Set([...preferred,...actual])];
+}
+function expenseAccountOpts(){return [{value:'',label:'Selecione a conta'},...expenseAccounts.map(x=>({value:x.id,label:x.nome}))]}
+function expenseMessage(message,bad=false){
+ const el=$('expenseFeedback');if(!el)return;
+ el.classList.remove('hidden');el.className='expense-status '+(bad?'error':'success');el.textContent=message;
+}
+function expenseSelectCategory(){
+ const cat=expenseG('exCat'),chosen=expenseG('exSub'),subs=expenseSubcategories(cat);
+ const field=$('exSubField');
+ if(!field)return;
+ field.classList.toggle('hidden',subs.length===0);
+ const options=[{value:'',label:'Sem subcategoria'},...subs.map(x=>({value:x,label:x}))];
+ $('exSub').innerHTML=options.map(o=>'<option value="'+escapeText(o.value)+'" '+(o.value===chosen?'selected':'')+'>'+escapeText(o.label)+'</option>').join('');
+}
+function expenseToggleFields(){
+ const status=expenseG('exStatus'),recurring=expenseG('exRecurring')==='true',payment=expenseG('exMethod');
+ const paid=status==='PAGO';
+ $('exPaidFields')?.classList.toggle('hidden',!paid);
+ $('exAccountWrap')?.classList.toggle('hidden',!paid||expenseCardMethod(payment));
+ $('exRecMonthsField')?.classList.toggle('hidden',!recurring);
+ const note=$('exPaidNote');
+ if(note)note.textContent=paid?(expenseCardMethod(payment)?
+ 'Pagamento por cartão: gera obrigação de cartão, sem baixa imediata em conta financeira.':
+ 'Despesa marcada como paga: o sistema registra a saída na conta financeira escolhida.'):'Despesa prevista: não gera saída realizada até que a parcela seja paga.';
+}
+async function loadMobileExpenses(){
+ expenseTab='list';expenseEdit=null;
+ $('results').innerHTML='<div class="notice">Carregando módulo de despesas…</div>';
+ try{
+  const [refs,accounts]=await Promise.all([rpc('apiReferenceDataV154',token),rpc('apiPaymentFinancialAccountsV172',token)]);
+  if(!refs||!Array.isArray(refs.categories)||!Array.isArray(refs.paymentMethods))throw Error('Não foi possível carregar categorias ou formas de pagamento.');
+  if(!Array.isArray(accounts))throw Error('Não foi possível carregar as contas financeiras.');
+  expenseReference=refs;expenseAccounts=accounts;
+  $('results').innerHTML='<div class="expense-tabs"><button type="button" class="active" data-exp-tab="list">Consultar despesas</button><button type="button" data-exp-tab="new">Nova despesa</button></div><div id="expenseFeedback" class="hidden"></div><div id="expenseContent"></div>';
+  await showExpenseTab('list');
+ }catch(err){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(err?.message||String(err))+'</p>'}
+}
+async function showExpenseTab(tab,record=null){
+ expenseTab=tab; expenseEdit=tab==='edit'?record:null;
+ document.querySelectorAll('[data-exp-tab]').forEach(b=>b.classList.toggle('active',b.dataset.expTab===tab||(tab==='edit'&&b.dataset.expTab==='new')));
+ const el=$('expenseContent');if(!el)return;
+ if(tab==='list'){
+  el.innerHTML='<p class="notice">Consultando despesas…</p>';
+  await expenseQuery();
+  return;
+ }
+ if(tab!=='new'&&tab!=='edit')return;
+ const e=expenseEdit||{},today=expenseDate(),cat=e.categoria||'',methods=expenseMethods(),isEdit=tab==='edit',locked=!!e.has_paid;
+ const form='<section class="mobile-panel"><h3>'+(isEdit?'Editar despesa':'Cadastrar despesa')+'</h3>'+
+ '<div class="expense-fields">'+
+ '<div class="full-span">'+expenseField('exDesc','Descrição','text',e.descricao||'','maxlength="250" required')+'</div>'+
+ expenseField('exBuy','Competência','date',e.data_compra||today,'required')+
+ expenseField('exDue','Vencimento / 1ª fatura','date',e.vencimento||today,(locked?'disabled ':'')+'required')+
+ expenseSelect('exCat','Categoria',[{value:'',label:'Selecione a categoria'},...expenseCategories().map(x=>({value:x,label:x}))],cat,'required')+
+ '<div id="exSubField">'+expenseSelect('exSub','Subcategoria',[{value:'',label:'Sem subcategoria'}],e.subcategoria||'')+'</div>'+
+ expenseField('exAmount','Valor total (R$)','number',isEdit?e.valor_total:'','step="0.01" min="0.01" inputmode="decimal" '+(locked?'disabled ':'')+'required')+
+ expenseSelect('exMethod','Forma de pagamento',methods.map(x=>({value:x,label:x})),e.forma_pagamento||'Pix',locked?'disabled':'')+
+ expenseField('exInstallments','Parcelas','number',e.qtd_parcelas||1,'min="1" max="120" step="1" '+(locked?'disabled ':''))+
+ (isEdit?'<div class="field"><label>Status</label><div class="notice">Alterações não modificam o status das parcelas já existentes.</div></div>':expenseSelect('exStatus','Status inicial',['PREVISTO','PAGO'],'PREVISTO'))+
+ (isEdit?'':expenseSelect('exRecurring','Recorrente?',[{value:'false',label:'Não'},{value:'true',label:'Sim'}],'false'))+
+ (isEdit?'':'<div id="exRecMonthsField" class="hidden">'+expenseField('exRecMonths','Meses recorrentes','number',12,'min="1" max="120" step="1"')+'</div>')+
+ '</div>'+
+ (isEdit?'':'<div id="exPaidFields" class="hidden">'+expenseField('exPaidDate','Data do pagamento','date',today)+
+ '<div id="exAccountWrap">'+expenseSelect('exAccount','Conta financeira de saída',expenseAccountOpts())+'</div></div>')+
+ '<div class="full-span">'+expenseField('exNotes','Observações','text',e.observacoes||'','maxlength="500"')+'</div>'+
+ (locked?'<div class="expense-status">Esta despesa já possui parcela paga. Valor, vencimento, forma e quantidade de parcelas não podem ser alterados.</div>':'')+
+ (isEdit?'':'<div class="expense-status" id="exPaidNote"></div>')+
+ '<div class="expense-actions"><button type="button" class="primary" data-ex-action="save">'+(isEdit?'Salvar alterações':'Cadastrar despesa')+'</button><button type="button" class="secondary" data-ex-action="list">Voltar à consulta</button></div>'+
+ '</section>';
+ el.innerHTML=form;
+ expenseSelectCategory();
+ if(e.subcategoria&&expenseSubcategories(cat).includes(e.subcategoria))$('exSub').value=e.subcategoria;
+ expenseToggleFields();
+ if(isEdit)$('exDesc').focus();
+}
+async function expenseQuery(){
+ if(expenseLoading)return;
+ expenseLoading=true;
+ try{
+  const params={start:$('start').value,end:$('end').value,status:''};
+  const records=await rpc('apiListExpenses',token,params);
+  if(!Array.isArray(records))throw Error('A consulta de despesas retornou um formato inesperado.');
+  expenseRows=records;
+  const sum=records.reduce((n,x)=>n+Number(x.valor||0),0);
+  const unpaid=records.filter(x=>x.status==='PREVISTO').reduce((n,x)=>n+Number(x.valor||0),0);
+  const stats='<div class="cash-totals"><div><small>Total do período</small><strong>'+fmt(sum)+'</strong></div><div><small>Em aberto</small><strong>'+fmt(unpaid)+'</strong></div></div>';
+  const rows=records.map(x=>'<div class="expense-row">'+
+   '<div class="expense-rowhead"><strong>'+escapeText(x.descricao||'Despesa')+'</strong><span class="expense-chip '+(x.status==='PAGO'?'paid':'')+'">'+escapeText(x.status)+'</span></div>'+
+   '<small>'+escapeText(x.vencimento||'')+' · '+escapeText(x.categoria||'')+(x.subcategoria?' / '+escapeText(x.subcategoria):'')+'</small>'+
+   '<div class="expense-rowhead"><strong>'+fmt(x.valor)+'</strong><small>Parcela '+escapeText(x.parcela||'1/1')+' · '+escapeText(x.forma||'')+'</small></div>'+
+   '<div>'+(x.can_edit?'<button class="secondary mini" data-ex-action="edit" data-id="'+escapeText(x.despesa_id)+'">Editar</button>':'')+
+   (x.can_pay?'<button class="secondary mini" data-ex-action="pay" data-id="'+escapeText(x.id)+'">Pagar parcela</button>':'')+'</div></div>').join('');
+  $('expenseContent').innerHTML=stats+(rows||'<div class="expense-empty">Nenhuma despesa encontrada neste período.</div>');
+ }catch(err){$('expenseContent').innerHTML='<p class="notice" role="alert">'+escapeText(err?.message||String(err))+'</p>'}
+ finally{expenseLoading=false}
+}
+async function saveExpenseMobile(){
+ const editing=expenseTab==='edit',e=expenseEdit||{};
+ const descricao=expenseG('exDesc'),data_compra=expenseG('exBuy'),vencimento=editing&&e.has_paid?e.vencimento:expenseG('exDue'),
+ categoria=expenseG('exCat'),subcategoria=expenseG('exSub'),forma_pagamento=editing&&e.has_paid?e.forma_pagamento:expenseG('exMethod'),
+ valor=editing&&e.has_paid?Number(e.valor_total):expenseMoney('exAmount'),
+ parcelas=editing&&e.has_paid?Number(e.qtd_parcelas):Number(expenseG('exInstallments'));
+ if(!descricao||!data_compra||!vencimento||!categoria||!forma_pagamento)throw Error('Preencha descrição, competência, vencimento, categoria e forma de pagamento.');
+ if(!(valor>0&&Number.isFinite(valor)))throw Error('Informe um valor maior que zero.');
+ if(!Number.isInteger(parcelas)||parcelas<1||parcelas>120)throw Error('Informe uma quantidade válida de parcelas.');
+ if(!expenseCategories().includes(categoria))throw Error('Selecione uma categoria cadastrada.');
+ if(subcategoria&&!expenseSubcategories(categoria).includes(subcategoria))throw Error('Selecione uma subcategoria válida.');
+ if(editing){
+  const payload={id:e.id,descricao,data_compra,vencimento,categoria,subcategoria,valor_total:valor,forma_pagamento,qtd_parcelas:parcelas,observacoes:expenseG('exNotes')};
+  if(!confirm('Salvar alterações na despesa "'+descricao+'"?'))return;
+  await rpc('apiUpdateExpense',token,payload);
+  await showExpenseTab('list');expenseMessage('Despesa atualizada com sucesso.');return;
+ }
+ const status=expenseG('exStatus'),recorrente=expenseG('exRecurring')==='true',recorrencia_meses=recorrente?Number(expenseG('exRecMonths')):1;
+ if(!Number.isInteger(recorrencia_meses)||recorrencia_meses<1||recorrencia_meses>120)throw Error('Quantidade de meses recorrentes inválida.');
+ const payload={descricao,data_compra,vencimento,categoria,subcategoria,valor,forma_pagamento,parcelas,status,recorrente,recorrencia_meses,observacoes:expenseG('exNotes')};
+ if(status==='PAGO'){
+  payload.data_pagamento=expenseG('exPaidDate');
+  if(!payload.data_pagamento)throw Error('Informe a data do pagamento.');
+  if(!expenseCardMethod(forma_pagamento)){
+   payload.conta_financeira_id=expenseG('exAccount');
+   if(!payload.conta_financeira_id||!expenseAccounts.some(x=>x.id===payload.conta_financeira_id))throw Error('Selecione a conta financeira de saída.');
+  }
+ }
+ const totalOccurrences=recorrente?recorrencia_meses:1;
+ const msg='Cadastrar '+totalOccurrences+' despesa(s) de '+fmt(valor)+' '+(parcelas>1?'em '+parcelas+' parcelas':'à vista')+' como '+status+'?'+(status==='PAGO'?' Haverá lançamento financeiro.':'');
+ if(!confirm(msg))return;
+ const out=await rpc('apiSaveExpense',token,payload);
+ if(!out?.ok)throw Error('Não foi possível confirmar a gravação da despesa.');
+ await showExpenseTab('list');
+ expenseMessage('Despesa cadastrada com sucesso. '+(recorrente?'Ocorrências: '+totalOccurrences+'.':''));
+}
+async function beginExpensePayment(id){
+ const row=expenseRows.find(x=>String(x.id)===String(id));
+ if(!row||!row.can_pay)throw Error('Esta parcela não está disponível para pagamento.');
+ const chooseAccount=!expenseCardMethod(row.forma);
+ $('expenseContent').innerHTML='<section class="mobile-panel"><h3>Pagar parcela</h3><p class="notice">'+escapeText(row.descricao)+' · '+fmt(row.valor)+' · Vencimento '+escapeText(row.vencimento)+'</p>'+
+ expenseField('exPayDate','Data do pagamento','date',expenseDate())+
+ (chooseAccount?expenseSelect('exPayAccount','Conta financeira de saída',expenseAccountOpts()):'<div class="expense-status">Pagamento por cartão gera obrigação. A baixa financeira será feita na quitação do cartão.</div>')+
+ '<div class="expense-actions"><button class="primary" data-ex-action="confirm-pay" data-id="'+escapeText(id)+'">Confirmar pagamento</button><button class="secondary" data-ex-action="list">Cancelar</button></div></section>';
+}
+async function confirmExpensePayment(id){
+ const row=expenseRows.find(x=>String(x.id)===String(id));
+ if(!row||!row.can_pay)throw Error('Parcela indisponível.');
+ const date=expenseG('exPayDate');if(!date)throw Error('Informe a data de pagamento.');
+ const account=expenseCardMethod(row.forma)?'':expenseG('exPayAccount');
+ if(!expenseCardMethod(row.forma)&&!account)throw Error('Selecione a conta de saída.');
+ if(!confirm('Confirmar pagamento de '+fmt(row.valor)+' referente a "'+row.descricao+'"?'))return;
+ await rpc('apiPayExpenseParcel',token,id,date,account);
+ await showExpenseTab('list');expenseMessage('Parcela paga e lançamento financeiro registrado.');
+}
+$('results').addEventListener('click',async ev=>{
+ if(page!=='expenses')return;
+ const tab=ev.target.closest('[data-exp-tab]');
+ if(tab){await showExpenseTab(tab.dataset.expTab);return;}
+ const btn=ev.target.closest('[data-ex-action]');
+ if(!btn)return;
+ if(btn.disabled)return;
+ btn.disabled=true;
+ try{
+  const type=btn.dataset.exAction,id=btn.dataset.id;
+  if(type==='list')await showExpenseTab('list');
+  else if(type==='save')await saveExpenseMobile();
+  else if(type==='edit'){
+   const details=await rpc('apiGetExpense',token,id);
+   if(!details?.id)throw Error('Despesa não encontrada.');
+   await showExpenseTab('edit',details);
+  }else if(type==='pay')await beginExpensePayment(id);
+  else if(type==='confirm-pay')await confirmExpensePayment(id);
+ }catch(error){expenseMessage(error?.message||String(error),true)}
+ finally{if(btn.isConnected)btn.disabled=false}
+});
+$('results').addEventListener('change',ev=>{
+ if(page!=='expenses')return;
+ if(ev.target.id==='exCat')expenseSelectCategory();
+ if(['exStatus','exMethod','exRecurring'].includes(ev.target.id))expenseToggleFields();
+});
+
 let financeMode='',financeTab='',financeBank=null,financeProfessionals=[],commissionDraft=null,financeBusy=false;
 const euro=x=>Number(x||0);
 const moneyInput=id=>{const raw=String($(id)?.value||'').replace(/\s/g,'').replace('R$','');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)};
