@@ -1049,7 +1049,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
  function menu(){return document.getElementById(menuId);}
  function normalize(t){return String(t||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim();}
  function items(){
-   var data=(window.STATE&&window.STATE.data&&window.STATE.data.allServices)||[];
+   var data=(typeof STATE!=='undefined'&&STATE.data&&STATE.data.allServices)||[];
    return Array.from(new Set(data.filter(function(s){return s.catalogo_status==='ATUAL';})
      .map(function(s){return String(s.nome||'').trim();}).filter(Boolean)))
      .sort(function(a,b){return a.localeCompare(b,'pt-BR');});
