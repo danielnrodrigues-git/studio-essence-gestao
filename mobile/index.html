@@ -374,6 +374,139 @@ async function renderBankTab(tab){
  }
 }
 
+
+async function financeAction(action,id){
+ const today=dates().end;
+ if(action==='previewCommission'){
+  if(!gv('closeProf')||!gv('closeStart')||!gv('closeEnd')){vmsg('Informe a profissional e o período.',true);return}
+  if(gv('closeStart')>gv('closeEnd')){vmsg('A data inicial não pode ser maior que a final.',true);return}
+  await safeWrite(async()=>{
+   const p=await rpc('apiCommissionPreview',token,{profissional_id:gv('closeProf'),start:gv('closeStart'),end:gv('closeEnd')});
+   if(!p||!Array.isArray(p.items)||!Array.isArray(p.advances))throw Error('Prévia do fechamento em formato inesperado.');
+   commissionDraft={...p,profissional_id:gv('closeProf'),start:gv('closeStart'),end:gv('closeEnd')};
+   renderCommissionDraft();
+  },'Prévia carregada. Revise os itens antes de confirmar.');
+  return;
+ }
+ if(action==='saveAdvance'){
+  const payload={profissional_id:gv('advProf'),data:gv('advDate'),valor:finitePositive(moneyInput('advValue'),'o vale'),forma_pagamento:gv('advPay'),observacoes:gv('advNotes')};
+  if(!payload.profissional_id||!payload.data||!payload.forma_pagamento){vmsg('Preencha profissional, data e forma de pagamento.',true);return}
+  if(!confirmWrite('Registrar vale de '+fmt(payload.valor)+'? Essa operação terá impacto no caixa.'))return;
+  await safeWrite(()=>rpc('apiSaveAdvance',token,payload),'Vale registrado com sucesso.',()=>selectFinanceTab('advance'));return;
+ }
+ if(action==='cancelAdvance'){
+  if(!id||!confirmWrite('Cancelar este vale? O lançamento financeiro será estornado.'))return;
+  await safeWrite(()=>rpc('apiCancelAdvance',token,id),'Vale cancelado.',()=>selectFinanceTab('advance'));return;
+ }
+ if(action==='saveClosing'||action==='payClosing'){
+  const data=collectDraft(),payNow=action==='payClosing';
+  const payload={profissional_id:commissionDraft.profissional_id,start:commissionDraft.start,end:commissionDraft.end,
+   items:data.items,advances:data.advances,adjustments:data.adjustment?[{tipo:data.adjustment<0?'DESCONTO':'BONUS',descricao:gv('closeAdjustmentDesc')||'Ajuste manual',valor:data.adjustment}]:[],
+   payNow,payment_date:gv('closePayDate'),payment_method:gv('closePayMethod')};
+  if(payNow&&(!payload.payment_date||!payload.payment_method))throw Error('Informe data e forma do pagamento.');
+  if(!confirmWrite((payNow?'Fechar E PAGAR':'Salvar fechamento')+' comissão líquida de '+fmt(data.net)+'? Verifique se os itens e vales estão corretos.'))return;
+  await safeWrite(()=>rpc('apiSaveCommission',token,payload),payNow?'Comissão fechada e paga.':'Fechamento salvo.',async()=>{commissionDraft=null;await selectFinanceTab('history')});return;
+ }
+ if(action==='payCommission'){
+  if(!id)return;
+  const date=window.prompt('Data de pagamento (AAAA-MM-DD):',today);if(!date)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Data de pagamento inválida.');
+  const method=window.prompt('Forma de pagamento:', 'Pix');if(!method)return;
+  if(!confirmWrite('Pagar este fechamento? A operação será lançada no caixa.'))return;
+  await safeWrite(()=>rpc('apiPayCommission',token,id,date,method),'Comissão paga.',()=>selectFinanceTab('history'));return;
+ }
+ if(action==='saveTransfer'){
+  const payload={data:gv('trDate'),conta_origem_id:gv('trFrom'),conta_destino_id:gv('trTo'),valor:finitePositive(moneyInput('trValue'),'a transferência'),descricao:gv('trDesc')};
+  if(!payload.data||!payload.conta_origem_id||!payload.conta_destino_id)throw Error('Selecione a data e as duas contas.');
+  if(payload.conta_origem_id===payload.conta_destino_id)throw Error('Origem e destino devem ser diferentes.');
+  if(!confirmWrite('Transferir '+fmt(payload.valor)+' entre as contas selecionadas?'))return;
+  await safeWrite(()=>rpc('apiTransferFinancialV172',token,payload),'Transferência registrada sem alterar o resultado financeiro.',async()=>{await refreshBank();await selectFinanceTab('transfer')});return;
+ }
+ if(action==='saveContribution'){
+  const payload={data:gv('conDate'),conta_financeira_id:gv('conAccount'),valor:finitePositive(moneyInput('conValue'),'o aporte'),descricao:gv('conDesc')};
+  if(!payload.data||!payload.conta_financeira_id)throw Error('Informe a conta e a data.');
+  if(!confirmWrite('Registrar aporte de '+fmt(payload.valor)+'?'))return;
+  await safeWrite(()=>rpc('apiSaveContributionV172',token,payload),'Aporte registrado.',async()=>{await refreshBank();await selectFinanceTab('contrib')});return;
+ }
+ if(action==='editAccount'){
+  const acc=(financeBank?.accounts||[]).find(x=>String(x.id)===String(id));
+  if(!acc)throw Error('Conta não encontrada.');
+  window.mobileEditAccount=acc;await selectFinanceTab('account');return;
+ }
+ if(action==='clearAccount'){window.mobileEditAccount=null;await selectFinanceTab('account');return}
+ if(action==='saveAccount'){
+  const edit=window.mobileEditAccount;
+  const flag=x=>gv(x)==='true';
+  const payload={id:edit?.id||'',nome:gv('accName'),tipo:gv('accType'),instituicao:gv('accInst'),
+   saldo_inicial:moneyInput('accOpening'),data_saldo_inicial:gv('accOpenDate'),ativo:flag('accActive'),
+   incluir_consolidado:flag('accConsolidated'),transitoria:flag('accTransit'),permite_conciliacao:flag('accRecon')};
+  if(!payload.nome||!payload.tipo||!payload.data_saldo_inicial||!Number.isFinite(payload.saldo_inicial))throw Error('Informe nome, tipo, saldo inicial e data.');
+  if(!confirmWrite((edit?'Atualizar':'Criar')+' conta financeira '+payload.nome+'?'))return;
+  await safeWrite(()=>rpc('apiSaveFinancialAccountV172',token,payload),'Conta salva.',async()=>{window.mobileEditAccount=null;await refreshBank();await selectFinanceTab('balances')});return;
+ }
+ if(action==='saveMapping'){
+  if(!id||!gv('map-'+id))throw Error('Selecione a conta financeira.');
+  if(!confirmWrite('Alterar a conta padrão dessa forma de pagamento?'))return;
+  await safeWrite(()=>rpc('apiSavePaymentAccountMapV172',token,{forma_id:id,conta_financeira_id:gv('map-'+id)}),'Vínculo atualizado.',async()=>{await refreshBank();await selectFinanceTab('mapping')});return;
+ }
+ if(action==='loadLedger'){
+  const rows=await rpc('apiFinancialLedgerV172',token,{account_id:gv('ledgerAccount'),start:gv('ledgerStart'),end:gv('ledgerEnd')});
+  if(!Array.isArray(rows))throw Error('Extrato em formato inesperado.');
+  $('ledgerRows').innerHTML=rows.map(x=>item(x.descricao||x.tipo||'Movimentação',[x.data,x.conta_financeira_nome||x.conta_nome,x.tipo].filter(Boolean).join(' · '),fmt(x.valor))).join('')||'<p class="notice">Nenhuma movimentação no período.</p>';
+  return;
+ }
+ if(action==='settleCard'){
+  const card=(window.mobileCardRows||[]).find(x=>String(x.id)===String(id));if(!card)return;
+  $('cardSettlement').innerHTML=panel('Liquidar recebível',fld('cardSetId','Identificador','text',card.id,'readonly')+fld('cardSetDate','Data da liquidação','date',today)+fld('cardSetGross','Valor bruto (R$)','number',euro(card.valor_bruto),'readonly')+fld('cardSetNet','Líquido efetivamente recebido (R$)','number',euro(card.liquido_estimado),'step="0.01" inputmode="decimal"')+choose('cardSetAccount','Conta de destino',acctOptions())+act('confirmSettleCard','Confirmar liquidação'));return;
+ }
+ if(action==='confirmSettleCard'){
+  const id=gv('cardSetId'),gross=moneyInput('cardSetGross'),net=moneyInput('cardSetNet'),account=gv('cardSetAccount'),date=gv('cardSetDate');
+  if(!date||!account||!Number.isFinite(gross)||!Number.isFinite(net)||net<0||net>gross)throw Error('Confira conta, data e valor líquido.');
+  if(!confirmWrite('Liquidar recebível de '+fmt(net)+' na conta selecionada?'))return;
+  await safeWrite(()=>rpc('apiSettleCardReceivableV172',token,id,{data_liquidacao:date,liquido_real:net,taxa_real:Number((gross-net).toFixed(2)),conta_destino_id:account}),'Recebível liquidado.',async()=>{await refreshBank();await selectFinanceTab('cards')});return;
+ }
+ if(action==='saveThird'){
+  const payload={data:gv('thirdDate'),beneficiario:gv('thirdName'),valor:finitePositive(moneyInput('thirdValue'),'o repasse'),taxa_cartao:moneyInput('thirdFee'),
+   absorve_taxa:gv('thirdOwner'),forma_origem:gv('thirdForm'),conta_recebimento_id:gv('thirdAccount'),
+   registrar_entrada:gv('thirdEntry')==='true',descricao:gv('thirdDesc')};
+  if(!payload.data||!payload.beneficiario||!payload.conta_recebimento_id||!Number.isFinite(payload.taxa_cartao)||payload.taxa_cartao<0)throw Error('Confira dados do terceiro, conta e taxa.');
+  if(!confirmWrite('Registrar valor de terceiro de '+fmt(payload.valor)+'?'))return;
+  await safeWrite(()=>rpc('apiSaveThirdPartyV172',token,payload),'Valor de terceiro registrado.',async()=>{await refreshBank();await selectFinanceTab('third')});return;
+ }
+ if(action==='payThird'){
+  $('thirdPayment').innerHTML=panel('Pagar repasse',fld('thirdPayId','Identificador','text',id,'readonly')+fld('thirdPayDate','Data do pagamento','date',today)+choose('thirdPayAccount','Conta de saída',acctOptions())+act('confirmThirdPayment','Confirmar pagamento'));return;
+ }
+ if(action==='confirmThirdPayment'){
+  if(!gv('thirdPayId')||!gv('thirdPayDate')||!gv('thirdPayAccount'))throw Error('Informe data e conta de saída.');
+  if(!confirmWrite('Pagar repasse de terceiro? Essa operação gera saída no caixa.'))return;
+  await safeWrite(()=>rpc('apiPayThirdPartyV172',token,gv('thirdPayId'),{conta_financeira_id:gv('thirdPayAccount'),data:gv('thirdPayDate')}),'Repasse pago.',async()=>{await refreshBank();await selectFinanceTab('third')});return;
+ }
+ if(action==='saveReconciliation'){
+  const payload={conta_financeira_id:gv('recAccount'),data_referencia:gv('recDate'),saldo_externo:moneyInput('recBalance'),observacoes:gv('recNotes')};
+  if(!payload.conta_financeira_id||!payload.data_referencia||!Number.isFinite(payload.saldo_externo))throw Error('Preencha conta, data e saldo externo.');
+  if(!confirmWrite('Registrar conferência de saldo? Não será criada transferência.'))return;
+  await safeWrite(async()=>{
+   const out=await rpc('apiReconcileAccountV172',token,payload);
+   $('reconResult').innerHTML=item('Resultado da conciliação',String(out.status||''),fmt(out.difference));
+  },'Conciliação registrada.');return;
+ }
+ if(action==='loadReconciliations'){
+  const rows=await rpc('apiListReconciliationsV172',token,{account_id:gv('recAccount')});
+  if(!Array.isArray(rows))throw Error('Histórico de conciliações inválido.');
+  $('reconHistory').innerHTML=rows.slice(0,30).map(x=>item(x.conta_financeira_nome||'Conta',[x.data_referencia,x.status].filter(Boolean).join(' · '),'Diferença '+fmt(x.diferenca))).join('')||'<p class="notice">Nenhuma conciliação.</p>';
+  return;
+ }
+}
+$('results').addEventListener('click',async e=>{
+ const tab=e.target.closest('[data-fintab]');if(tab){await selectFinanceTab(tab.dataset.fintab);return}
+ const btn=e.target.closest('[data-finance]');if(!btn)return;
+ try{await financeAction(btn.dataset.finance,btn.dataset.id||'')}
+ catch(err){vmsg(err.message||String(err),true)}
+});
+$('results').addEventListener('input',e=>{
+ if(commissionDraft&&e.target.closest('#closePreview')&&e.target.matches('input'))calcCommissionDraft();
+});
+
 function openPage(p){page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
 $('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=loadPage;document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
 const range=dates();$('start').value=range.start;$('end').value=range.end;
