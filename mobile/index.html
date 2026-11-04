@@ -150,6 +150,17 @@ $('installNativeBtn').onclick=triggerNativeInstall;
 $('installModal').addEventListener('click',e=>{if(e.target===$('installModal'))closeInstallHelp()});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')closeInstallHelp()});
 updateInstall();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
+   reg.update().catch(()=>{});
+   document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{})});
+ }).catch(()=>{});
+ let updated=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+   if(updated)return;
+   updated=true;
+   location.reload();
+ });
+}
 })();
 </script></body></html>
