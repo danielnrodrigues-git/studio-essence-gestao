@@ -1021,5 +1021,128 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
 </script>
 <script id="versionDisplayHF12">(function(){function sync(){var version='v1.8.1 HF15';['systemVersionBadge','loginVersionText'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=version;});}sync();document.addEventListener('DOMContentLoaded',sync);})();</script>
 <script id="perfVersionHF13">(function(){window.STUDIO_SYSTEM_VERSION='v1.8.1 HF15';})();</script>
+<style id="service-search-autocomplete-hf16-css">
+#manage-services .service-search-ac{position:relative;min-width:0}
+#manage-services .service-search-ac input{width:100%}
+#manage-services .service-search-ac-options{
+ position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:220;max-height:258px;
+ overflow-y:auto;background:var(--card,#fff);border:1px solid var(--line,#eadde2);
+ border-radius:12px;box-shadow:0 12px 30px rgba(50,27,39,.15);padding:5px;
+}
+#manage-services .service-search-ac-options[hidden]{display:none!important}
+#manage-services .service-search-ac-option{
+ display:block;width:100%;border:0;border-radius:8px;background:transparent;
+ color:var(--ink,#30272b);text-align:left;padding:10px 11px;cursor:pointer;font-size:13px;
+}
+#manage-services .service-search-ac-option:hover,
+#manage-services .service-search-ac-option[aria-selected="true"]{
+ background:var(--rose2,#f4e7ec);color:var(--wine,#6f243f);
+}
+#manage-services .service-search-ac-empty{padding:10px 11px;font-size:12px;color:var(--muted,#7f7479)}
+</style>
+<script id="service-search-autocomplete-hf16">
+(function(){
+ 'use strict';
+ var searchId='fSrvName', menuId='fSrvNameSuggestionsHF16';
+ var active=-1;
+ function el(){return document.getElementById(searchId);}
+ function menu(){return document.getElementById(menuId);}
+ function normalize(t){return String(t||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim();}
+ function items(){
+   var data=(window.STATE&&window.STATE.data&&window.STATE.data.allServices)||[];
+   return Array.from(new Set(data.filter(function(s){return s.catalogo_status==='ATUAL';})
+     .map(function(s){return String(s.nome||'').trim();}).filter(Boolean)))
+     .sort(function(a,b){return a.localeCompare(b,'pt-BR');});
+ }
+ function hide(){var m=menu();if(m)m.hidden=true;active=-1;}
+ function setup(){
+   var input=el();if(!input)return;
+   input.removeAttribute('list');input.setAttribute('autocomplete','off');
+   input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');
+   input.setAttribute('aria-controls',menuId);input.setAttribute('aria-expanded','false');
+   var wrap=input.parentElement;
+   if(!wrap)return;
+   wrap.classList.add('service-search-ac');
+   if(!menu()){
+     var m=document.createElement('div');m.id=menuId;m.className='service-search-ac-options';
+     m.setAttribute('role','listbox');m.hidden=true;wrap.appendChild(m);
+   }
+ }
+ function show(){
+   var input=el();if(!input)return;
+   setup();
+   var m=menu();if(!m)return;
+   var query=normalize(input.value);
+   if(query.length<1){hide();input.setAttribute('aria-expanded','false');return;}
+   var matches=items().filter(function(x){return normalize(x).includes(query);}).slice(0,8);
+   m.replaceChildren();active=-1;
+   if(!matches.length){
+     var empty=document.createElement('div');empty.className='service-search-ac-empty';
+     empty.textContent='Nenhum serviço encontrado';m.appendChild(empty);
+   }else{
+     matches.forEach(function(label,i){
+       var b=document.createElement('button');b.type='button';b.className='service-search-ac-option';
+       b.setAttribute('role','option');b.setAttribute('aria-selected','false');b.textContent=label;
+       b.addEventListener('mousedown',function(e){e.preventDefault();});
+       b.addEventListener('click',function(){choose(label);});
+       m.appendChild(b);
+     });
+   }
+   m.hidden=false;input.setAttribute('aria-expanded','true');
+ }
+ function choose(label){
+   var input=el();if(!input)return;
+   input.value=label;hide();input.setAttribute('aria-expanded','false');
+   input.dispatchEvent(new Event('input',{bubbles:true}));
+   input.focus();
+   hide();input.setAttribute('aria-expanded','false');
+ }
+ function selectIndex(index){
+   var m=menu();if(!m)return;
+   var opts=Array.from(m.querySelectorAll('.service-search-ac-option'));
+   if(!opts.length)return;
+   active=(index+opts.length)%opts.length;
+   opts.forEach(function(b,i){b.setAttribute('aria-selected',String(i===active));});
+   opts[active].scrollIntoView({block:'nearest'});
+ }
+ document.addEventListener('focusin',function(e){
+   if(e.target&&e.target.id===searchId){setup();show();}
+ });
+ document.addEventListener('input',function(e){
+   if(e.target&&e.target.id===searchId)show();
+ });
+ document.addEventListener('keydown',function(e){
+   if(!e.target||e.target.id!==searchId)return;
+   var m=menu(),open=m&&!m.hidden;
+   if(e.key==='Escape'){hide();e.target.setAttribute('aria-expanded','false');return;}
+   if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+     if(!open)show();
+     m=menu();
+     if(m&&!m.hidden&&m.querySelector('.service-search-ac-option')){
+       e.preventDefault();selectIndex(active+(e.key==='ArrowDown'?1:-1));
+     }
+   }else if(e.key==='Enter'&&open&&active>=0){
+     var opts=m.querySelectorAll('.service-search-ac-option');
+     if(opts[active]){e.preventDefault();choose(opts[active].textContent);}
+   }
+ });
+ document.addEventListener('pointerdown',function(e){
+   var m=menu(),input=el();
+   if(m&&input&&!m.contains(e.target)&&e.target!==input){
+     hide();input.setAttribute('aria-expanded','false');
+   }
+ });
+ // The settings filter is rendered after authentication. Initialize when it appears.
+ var observer=new MutationObserver(function(){
+   var input=el();
+   if(input&&(!input.closest('.service-search-ac')||input.hasAttribute('list')))setup();
+ });
+ function ready(){
+   setup();observer.observe(document.body,{childList:true,subtree:true});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);
+ else ready();
+})();
+</script>
 </body>
 </html>
