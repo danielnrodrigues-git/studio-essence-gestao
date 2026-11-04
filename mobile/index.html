@@ -309,6 +309,71 @@ function calcCommissionDraft(){
  catch(e){if($('closeTotals'))$('closeTotals').textContent=e.message}
 }
 
+
+async function refreshBank(){const b=await rpc('apiFinancialBootstrapV172',token);if(!b||!Array.isArray(b.accounts))throw Error('Não foi possível atualizar contas financeiras.');financeBank=b}
+async function renderBankTab(tab){
+ const d=dates(),b=financeBank||{},accounts=b.accounts||[],position=b.position||{};
+ if(tab==='balances'){
+  const cards=accounts.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.nome)+' · '+fmt(x.saldo)+'</strong><small>'+escapeText(x.tipo)+' · '+(String(x.ativo)==='false'||String(x.ativo)==='0'?'INATIVA':'ATIVA')+'</small><button class="secondary mini" data-finance="editAccount" data-id="'+escapeText(x.id)+'">Editar conta</button></div>').join('');
+  $('financeBody').innerHTML=panel('Posição consolidada',item('Total financeiro','Saldos consolidados',fmt(position.total))+item('Comissões a pagar','Obrigações com profissionais',fmt(position.commissionPayable))+item('Terceiros a repassar','Obrigações com terceiros',fmt(position.thirdPartyPayable))+item('Saldo disponível','Após obrigações',fmt(position.available)))+panel('Contas financeiras',cards||'<p class="notice">Nenhuma conta cadastrada.</p>');
+ }
+ if(tab==='transfer'){
+  const rows=await rpc('apiListTransfersV172',token,{start:d.start,end:d.end});
+  if(!Array.isArray(rows))throw Error('Histórico de transferências em formato inesperado.');
+  $('financeBody').innerHTML=panel('Transferir entre contas',
+    fld('trDate','Data','date',d.end)+choose('trFrom','Conta de origem',acctOptions())+choose('trTo','Conta de destino',acctOptions())+fld('trValue','Valor (R$)','number','','step="0.01" min="0.01" inputmode="decimal"')+fld('trDesc','Descrição / motivo')+act('saveTransfer','Confirmar transferência')+'<p class="mobile-form-note">Transferências alteram os saldos das contas, mas não o resultado financeiro do Studio.</p>')+
+    panel('Transferências do período',rows.map(x=>item((x.conta_origem_nome||'Origem')+' → '+(x.conta_destino_nome||'Destino'),(x.data||'')+' · '+(x.descricao||''),fmt(x.valor))).join('')||'<p class="notice">Nenhuma transferência no período.</p>');
+ }
+ if(tab==='contrib'){
+  $('financeBody').innerHTML=panel('Registrar aporte',fld('conDate','Data','date',d.end)+choose('conAccount','Conta de destino',acctOptions())+fld('conValue','Valor (R$)','number','','min="0.01" step="0.01" inputmode="decimal"')+fld('conDesc','Descrição')+act('saveContribution','Registrar aporte')+'<p class="mobile-form-note">Aporte é uma entrada de recursos do sócio e não deve ser confundido com faturamento.</p>');
+ }
+ if(tab==='account'){
+  const edit=window.mobileEditAccount||null;
+  const tf=(value)=>opt(['BANCO','CARTEIRA','CAIXA','TRANSITORIA','RECEBIVEIS','OUTRA'],value);
+  const yesNo=(v)=>'<option value="true" '+(v?'selected':'')+'>Sim</option><option value="false" '+(!v?'selected':'')+'>Não</option>';
+  const truth=(v,dflt=true)=>v==null?dflt:String(v).toLowerCase()==='true'||String(v)==='1';
+  $('financeBody').innerHTML=panel(edit?'Editar conta financeira':'Cadastrar conta financeira',
+   fld('accName','Nome da conta','text',edit?.nome||'')+choose('accType','Tipo',tf(edit?.tipo||'BANCO'))+
+   fld('accInst','Instituição','text',edit?.instituicao||'')+
+   '<div class="mobile-grid">'+fld('accOpening','Saldo inicial (R$)','number',euro(edit?.saldo_inicial),'step="0.01" inputmode="decimal"')+fld('accOpenDate','Data do saldo inicial','date',String(edit?.data_saldo_inicial||d.end).substring(0,10))+'</div>'+
+   '<div class="mobile-grid">'+choose('accActive','Conta ativa?',yesNo(truth(edit?.ativo)))+choose('accConsolidated','Consolidar saldo?',yesNo(truth(edit?.incluir_consolidado)))+
+   choose('accTransit','Conta transitória?',yesNo(truth(edit?.transitoria,false)))+choose('accRecon','Permite conciliação?',yesNo(truth(edit?.permite_conciliacao)))+'</div>'+
+   '<div class="actionline">'+act('saveAccount','Salvar conta')+act('clearAccount','Limpar','secondary')+'</div><p class="mobile-form-note">Alterações em saldo inicial ou consolidação podem afetar relatórios. Confira os dados antes de confirmar.</p>');
+ }
+ if(tab==='mapping'){
+  const methods=b.paymentMethods||[],maps=b.mappings||[];
+  $('financeBody').innerHTML=panel('Conta padrão por forma de pagamento','<p class="mobile-form-note">Define onde cada recebimento é registrado. Preserve as regras atuais quando não houver alteração necessária.</p>'+methods.map(x=>{
+   const map=maps.find(y=>String(y.forma_id)===String(x.id));
+   return '<div class="mobile-entry"><strong>'+escapeText(x.nome)+'</strong>'+choose('map-'+escapeText(x.id),'Conta financeira',acctOptions(map?.conta_financeira_id))+'<button class="secondary mini" data-finance="saveMapping" data-id="'+escapeText(x.id)+'">Salvar vínculo</button></div>';
+  }).join('')||'<p class="notice">Nenhuma forma de pagamento disponível.</p>');
+ }
+ if(tab==='ledger'){
+  $('financeBody').innerHTML=panel('Extrato / razão por conta',choose('ledgerAccount','Conta','<option value="">Todas as contas</option>'+acctOptions('',false))+'<div class="mobile-grid">'+fld('ledgerStart','De','date',d.start)+fld('ledgerEnd','Até','date',d.end)+'</div>'+act('loadLedger','Consultar extrato')+'<div id="ledgerRows"></div>');
+ }
+ if(tab==='cards'){
+  const rows=await rpc('apiListCardReceivablesV172',token,{status:''});
+  if(!Array.isArray(rows))throw Error('Recebíveis em formato inesperado.');
+  window.mobileCardRows=rows;
+  $('financeBody').innerHTML=panel('Recebíveis de cartão',rows.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.forma_pagamento||'Cartão')+' · '+fmt(x.liquido_estimado)+'</strong><small>'+escapeText(x.data_venda||'')+' · '+escapeText(x.status)+' · Bruto '+fmt(x.valor_bruto)+'</small>'+(x.status==='ABERTO'?'<button class="secondary mini" data-finance="settleCard" data-id="'+escapeText(x.id)+'">Liquidar recebível</button>':'')+'</div>').join('')||'<p class="notice">Nenhum recebível.</p>')+'<div id="cardSettlement"></div>';
+ }
+ if(tab==='third'){
+  const rows=await rpc('apiListThirdPartyV172',token,{});
+  if(!Array.isArray(rows))throw Error('Repasses em formato inesperado.');
+  $('financeBody').innerHTML=panel('Registrar valor de terceiro',
+   fld('thirdDate','Data','date',d.end)+fld('thirdName','Beneficiário')+
+   '<div class="mobile-grid">'+fld('thirdValue','Valor bruto (R$)','number','','step="0.01" min="0.01"')+fld('thirdFee','Taxa do cartão (R$)','number','0','step="0.01" min="0"')+'</div>'+
+   choose('thirdOwner','Quem absorve a taxa?',opt(['TERCEIRO','STUDIO'],'TERCEIRO'))+
+   fld('thirdForm','Forma de origem','text','Pix')+
+   choose('thirdAccount','Conta de recebimento',acctOptions())+
+   choose('thirdEntry','Registrar entrada financeira?',opt(['true','false'],'true'))+
+   fld('thirdDesc','Descrição')+act('saveThird','Registrar valor de terceiro'))+
+   panel('Repasses',rows.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.beneficiario)+' · '+fmt(x.valor_liquido)+'</strong><small>'+escapeText(x.data_origem||'')+' · '+escapeText(x.status)+'</small>'+(x.status!=='PAGO'?'<button class="secondary mini" data-finance="payThird" data-id="'+escapeText(x.id)+'">Pagar repasse</button>':'')+'</div>').join('')||'<p class="notice">Nenhum repasse.</p>')+'<div id="thirdPayment"></div>';
+ }
+ if(tab==='reconcile'){
+  $('financeBody').innerHTML=panel('Conciliação de saldos',choose('recAccount','Conta',acctOptions())+fld('recDate','Data de referência','date',d.end)+fld('recBalance','Saldo informado (R$)','number','','step="0.01" inputmode="decimal"')+fld('recNotes','Observações')+act('saveReconciliation','Conferir e registrar conciliação')+'<div id="reconResult"></div>')+panel('Histórico recente','<div id="reconHistory">Selecione uma conta e consulte.</div>'+act('loadReconciliations','Consultar conciliações','secondary'));
+ }
+}
+
 function openPage(p){page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
 $('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=loadPage;document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
 const range=dates();$('start').value=range.start;$('end').value=range.end;
