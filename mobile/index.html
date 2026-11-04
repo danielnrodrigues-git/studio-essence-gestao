@@ -145,6 +145,170 @@ if(page==='cash'){
 if(page==='expenses'){records=await rpc('apiListExpenses',token,{...params,status:''});$('results').innerHTML=(records||[]).map(x=>item(x.descricao,x.vencimento+' · '+(x.status||'')+' · '+(x.categoria||''),fmt(x.valor))).join('')||'<p class="notice">Nenhuma despesa no período.</p>'}
 if(page==='accounts'){await loadMobileFinance('accounts');return;}
 }catch(e){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(e.message)+'</p>'}finally{status('')}}
+
+let financeMode='',financeTab='',financeBank=null,financeProfessionals=[],commissionDraft=null,financeBusy=false;
+const euro=x=>Number(x||0);
+const moneyInput=id=>{const raw=String($(id)?.value||'').replace(/\s/g,'').replace('R{page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
+$('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=loadPage;document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
+const range=dates();$('start').value=range.start;$('end').value=range.end;
+function standalone(){return window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}
+function isIOS(){return /iPhone|iPad|iPod/i.test(navigator.userAgent)}
+function isAndroid(){return /Android/i.test(navigator.userAgent)}
+function updateInstall(){const show=!standalone()&&!sessionStorage.getItem('studioInstallCompleted');['installLogin','installHome'].forEach(id=>$(id).classList.toggle('hidden',!show))}
+function steps(items){return '<ol>'+items.map(t=>'<li><span>'+t+'</span></li>').join('')+'</ol>'}
+function openInstallHelp(){
+ const content=$('installHelpContent'),native=$('installNativeBtn');
+ native.classList.add('hidden');
+ if(isIOS()){
+   content.innerHTML='<p class="guide-label">No iPhone / iPad</p>'+steps(['Abra o Studio Essence pelo <strong>Safari</strong>.','Toque em <strong>Compartilhar</strong> (ícone de quadrado com seta para cima).','Escolha <strong>Adicionar à Tela de Início</strong>.','Se disponível, ative <strong>Abrir como App da Web</strong> e toque em <strong>Adicionar</strong>.'])+'<div class="tip">Depois, abra o Studio Essence pelo novo ícone na tela inicial do aparelho.</div>';
+ }else if(isAndroid()){
+   content.innerHTML='<p class="guide-label">No Android</p>'+steps(['Abra o Studio Essence no <strong>Chrome</strong>.','Toque em <strong>Instalar agora</strong> abaixo, se disponível.','Caso a opção não apareça, abra o menu <strong>⋮</strong> do navegador e escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong>.','Confirme a instalação e abra o app pelo ícone <strong>Studio Essence</strong>.'])+'<div class="tip">Ao abrir pelo ícone instalado, o convite para instalação será ocultado.</div>';
+   if(installedPrompt)native.classList.remove('hidden');
+ }else{
+   content.innerHTML='<p class="guide-label">No computador</p>'+steps(['Abra o Studio Essence no Chrome ou Edge.','Clique no ícone de instalação na barra de endereço ou procure <strong>Instalar aplicativo</strong> no menu do navegador.','Confirme para adicionar o aplicativo.']);
+   if(installedPrompt)native.classList.remove('hidden');
+ }
+ $('installModal').classList.remove('hidden');
+ $('installClose').focus();
+}
+function closeInstallHelp(){$('installModal').classList.add('hidden')}
+async function triggerNativeInstall(){
+ if(!installedPrompt)return;
+ const prompt=installedPrompt; installedPrompt=null;
+ await prompt.prompt();const answer=await prompt.userChoice;
+ if(answer?.outcome==='accepted'){closeInstallHelp();updateInstall()}
+}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installedPrompt=e;updateInstall()});
+window.addEventListener('appinstalled',()=>{sessionStorage.setItem('studioInstallCompleted','1');installedPrompt=null;closeInstallHelp();updateInstall()});
+document.querySelectorAll('[data-install-open]').forEach(btn=>btn.addEventListener('click',openInstallHelp));
+$('installClose').onclick=closeInstallHelp;$('installDoneBtn').onclick=closeInstallHelp;
+$('installNativeBtn').onclick=triggerNativeInstall;
+$('installModal').addEventListener('click',e=>{if(e.target===$('installModal'))closeInstallHelp()});
+window.addEventListener('keydown',e=>{if(e.key==='Escape')closeInstallHelp()});
+updateInstall();
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
+   reg.update().catch(()=>{});
+   document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{})});
+ }).catch(()=>{});
+ let updated=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+   if(updated)return;
+   updated=true;
+   location.reload();
+ });
+}
+})();
+</script></body></html>,'');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)};
+const gv=id=>String($(id)?.value||'').trim();
+const acctOptions=(selected='',blank=true)=> (blank?'<option value="">Selecione uma conta</option>':'')+(financeBank?.accounts||[]).filter(a=>String(a.ativo)!=='false'&&String(a.ativo)!=='0').map(a=>'<option value="'+escapeText(a.id)+'" '+(String(a.id)===String(selected)?'selected':'')+'>'+escapeText(a.nome)+'</option>').join('');
+const profOptions=(selected='')=>'<option value="">Selecione a profissional</option>'+financeProfessionals.map(p=>'<option value="'+escapeText(p.id)+'" '+(String(p.id)===String(selected)?'selected':'')+'>'+escapeText(p.nome)+'</option>').join('');
+const fld=(id,label,type='text',value='',extra='')=>'<div class="field"><label for="'+id+'">'+label+'</label><input id="'+id+'" type="'+type+'" value="'+escapeText(value)+'" '+extra+'></div>';
+const choose=(id,label,options)=>'<div class="field"><label for="'+id+'">'+label+'</label><select id="'+id+'">'+options+'</select></div>';
+const opt=(items,selected='')=>items.map(x=>'<option value="'+escapeText(x)+'" '+(x===selected?'selected':'')+'>'+escapeText(x)+'</option>').join('');
+const act=(name,label,style='primary')=>'<button type="button" class="'+style+'" data-finance="'+name+'">'+label+'</button>';
+const panel=(title,html)=>'<section class="mobile-panel"><h3>'+title+'</h3>'+html+'</section>';
+const vmsg=(text,bad=false)=>{const e=$('financeFeedback');if(e){e.className='mobile-feedback '+(bad?'bad':'good');e.textContent=text;e.classList.remove('hidden')}};
+function finitePositive(v,name){if(!Number.isFinite(v)||v<=0)throw Error('Informe um valor válido maior que zero para '+name+'.');return Number(v.toFixed(2))}
+function confirmWrite(message){if(!navigator.onLine)throw Error('É necessário estar conectado à internet.');return window.confirm(message)}
+async function safeWrite(fn,success,refresh){
+ if(financeBusy)return;
+ financeBusy=true;document.querySelectorAll('[data-finance]').forEach(x=>x.disabled=true);
+ try{await fn();vmsg(success);if(refresh)await refresh();}
+ catch(e){vmsg(e.message||String(e),true)}
+ finally{financeBusy=false;document.querySelectorAll('[data-finance]').forEach(x=>x.disabled=false)}
+}
+function financeTabs(mode){
+ const tabs=mode==='commissions'?[['history','Fechamentos'],['advance','Vales / adiantamentos'],['closing','Fechar comissão']]:
+ [['balances','Contas e saldos'],['transfer','Transferências'],['contrib','Aportes'],['account','Cadastrar / editar'],['mapping','Formas de pagamento'],['ledger','Extrato'],['cards','Cartões'],['third','Repasses'],['reconcile','Conciliação']];
+ return '<div class="mobile-tabs">'+tabs.map(([id,label])=>'<button type="button" data-fintab="'+id+'" class="'+(id===financeTab?'active':'')+'">'+label+'</button>').join('')+'</div>';
+}
+async function loadMobileFinance(mode){
+ financeMode=mode; financeTab=mode==='commissions'?'history':'balances'; commissionDraft=null;
+ $('results').innerHTML='<div class="notice">Carregando '+(mode==='commissions'?'comissões':'contas financeiras')+'…</div>';
+ try{
+  if(mode==='commissions'){
+   const p=await rpc('apiCommissionHistoryProfessionalsV160',token);
+   if(!Array.isArray(p))throw Error('Não foi possível carregar os profissionais.');
+   financeProfessionals=p;
+  }else{
+   financeBank=await rpc('apiFinancialBootstrapV172',token);
+   if(!financeBank||!Array.isArray(financeBank.accounts))throw Error('Não foi possível carregar as contas financeiras.');
+  }
+  $('results').innerHTML='<div id="financeTabs"></div><div id="financeFeedback" class="hidden"></div><div id="financeBody"></div>';
+  await selectFinanceTab(financeTab);
+ }catch(e){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(e.message)+'</p>'}
+}
+async function selectFinanceTab(tab){
+ financeTab=tab;
+ if(!$('financeTabs'))return;
+ $('financeTabs').innerHTML=financeTabs(financeMode);
+ $('financeBody').innerHTML='<p class="notice">Carregando…</p>';
+ $('financeFeedback').classList.add('hidden');
+ try{
+  if(financeMode==='commissions')await renderCommissionTab(tab);
+  else await renderBankTab(tab);
+ }catch(e){$('financeBody').innerHTML='<p class="notice" role="alert">'+escapeText(e.message)+'</p>'}
+}
+async function renderCommissionTab(tab){
+ const d=dates();
+ if(tab==='history'){
+  const rows=await rpc('apiCommissionHistory',token,{profissional_id:'',start:d.start,end:d.end,status:''});
+  if(!Array.isArray(rows))throw Error('Histórico de fechamentos em formato inesperado.');
+  $('financeBody').innerHTML=panel('Histórico de fechamentos',rows.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.total)+'</strong><small>'+escapeText(x.inicio)+' a '+escapeText(x.fim)+' · '+escapeText(x.status)+'</small>'+((x.status!=='PAGO')?'<button type="button" class="secondary mini" data-finance="payCommission" data-id="'+escapeText(x.id)+'">Pagar comissão</button>':'')+'</div>').join('')||'<p class="notice">Nenhum fechamento no período.</p>');
+ }
+ if(tab==='advance'){
+  const advances=await rpc('apiListAdvances',token,{profissional_id:'',start:d.start,end:d.end});
+  if(!Array.isArray(advances))throw Error('Histórico de vales em formato inesperado.');
+  const form=choose('advProf','Profissional',profOptions())+
+   '<div class="mobile-grid">'+fld('advDate','Data','date',d.end)+fld('advValue','Valor (R$)','number','','step="0.01" min="0.01" inputmode="decimal"')+'</div>'+
+   choose('advPay','Forma de pagamento',opt(['Pix','Dinheiro','Débito','Crédito']))+
+   fld('advNotes','Observações')+act('saveAdvance','Registrar vale / adiantamento')+
+   '<p class="mobile-form-note">O adiantamento será registrado no caixa e ficará disponível para compensação em um fechamento.</p>';
+  const list=advances.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional)+' · '+fmt(x.valor)+'</strong><small>'+escapeText(x.data)+' · '+escapeText(x.status)+' · Saldo '+fmt(x.saldo)+'</small>'+escapeText(x.observacoes||'')+((x.status!=='CANCELADO'&&Number(x.compensado||0)<.005)?'<button type="button" class="danger mini" data-finance="cancelAdvance" data-id="'+escapeText(x.id)+'">Cancelar vale</button>':'')+'</div>').join('')||'<p class="notice">Nenhum vale encontrado.</p>';
+  $('financeBody').innerHTML=panel('Novo vale / adiantamento',form)+panel('Histórico de vales',list);
+ }
+ if(tab==='closing'){
+  $('financeBody').innerHTML=panel('Fechamento de comissão',choose('closeProf','Profissional',profOptions())+'<div class="mobile-grid">'+fld('closeStart','De','date',d.start)+fld('closeEnd','Até','date',d.end)+'</div>'+act('previewCommission','Carregar serviços, vendas e vales')+'<p class="mobile-form-note">Revise os itens, taxas, ajustes e vales antes de salvar ou pagar.</p>')+'<div id="closePreview"></div>';
+ }
+}
+function renderCommissionDraft(){
+ const box=$('closePreview');if(!box||!commissionDraft)return;
+ const items=commissionDraft.items||[],adv=commissionDraft.advances||[];
+ let html=panel('Itens para fechamento',items.map((x,i)=>'<div class="mobile-entry" data-citem="'+i+'"><label class="inline-check"><input type="checkbox" class="c-on" checked> <strong>'+escapeText(x.descricao||'Item')+'</strong></label><small>'+escapeText(x.cliente||'')+' · '+escapeText(x.data||'')+' · '+escapeText(x.source_type||'')+'</small><div class="mobile-grid">'+fld('cbase-'+i,'Base (R$)','number',euro(x.base),'step="0.01" inputmode="decimal" class="c-base"')+fld('cpct-'+i,'Comissão (%)','number',(euro(x.percentual)*100).toFixed(2),'step="0.01" inputmode="decimal" class="c-pct"')+'</div>'+fld('cref-'+i,'Valor de referência (R$)','number',euro(x.valor_referencia),'step="0.01" inputmode="decimal" class="c-ref"')+'</div>').join('')||'<p class="notice">Nenhum serviço ou venda pendente neste período.</p>');
+ if(!items.length){box.innerHTML=html;return;}
+ if(adv.length)html+=panel('Vales disponíveis para compensação',adv.map((x,i)=>'<div class="mobile-entry" data-cadv="'+i+'"><label class="inline-check"><input type="checkbox" class="a-on" checked> '+escapeText(x.observacoes||'Vale / adiantamento')+'</label><small>Saldo disponível: '+fmt(x.saldo)+'</small>'+fld('ause-'+i,'Abater (R$)','number',euro(x.saldo),'step="0.01" inputmode="decimal" class="a-use"')+'</div>').join(''));
+ html+=panel('Resumo e confirmação',fld('closeAdjustment','Ajuste manual (R$), + bônus / − desconto','number','0','step="0.01" inputmode="decimal"')+fld('closeAdjustmentDesc','Descrição do ajuste')+'<div id="closeTotals" class="notice"></div>'+fld('closePayDate','Data de pagamento','date',dates().end)+choose('closePayMethod','Forma de pagamento',opt(['Pix','Dinheiro','Débito','Crédito']))+'<div class="actionline">'+act('saveClosing','Salvar fechamento','secondary')+act('payClosing','Fechar e pagar')+'</div><p class="mobile-form-note">Salvar não paga a comissão. Fechar e pagar registra a saída financeira.</p>');
+ box.innerHTML=html;calcCommissionDraft();
+}
+function collectDraft(){
+ if(!commissionDraft)throw Error('Carregue a prévia antes de fechar.');
+ const items=[];
+ document.querySelectorAll('[data-citem]').forEach(row=>{
+  if(!row.querySelector('.c-on').checked)return;
+  const i=Number(row.dataset.citem),x=commissionDraft.items[i],base=moneyInput('cbase-'+i),pct=moneyInput('cpct-'+i)/100,ref=moneyInput('cref-'+i);
+  if(!Number.isFinite(base)||base<0||!Number.isFinite(pct)||pct<0||!Number.isFinite(ref)||ref<0)throw Error('Revise base, percentual e referência.');
+  items.push({...x,valor_referencia:ref,base,percentual:pct,comissao:Number((base*pct).toFixed(2))});
+ });
+ if(!items.length)throw Error('Selecione ao menos um item.');
+ const adjustment=moneyInput('closeAdjustment');if(!Number.isFinite(adjustment))throw Error('Ajuste inválido.');
+ const gross=Math.max(0,items.reduce((sum,x)=>sum+x.comissao,0)+adjustment);
+ let remaining=gross;
+ const advances=[];
+ document.querySelectorAll('[data-cadv]').forEach(row=>{
+  if(!row.querySelector('.a-on').checked||remaining<=0)return;
+  const x=commissionDraft.advances[Number(row.dataset.cadv)],requested=moneyInput('ause-'+row.dataset.cadv);
+  if(!Number.isFinite(requested)||requested<0)throw Error('Valor de vale inválido.');
+  const used=Math.min(requested,Number(x.saldo||0),remaining);
+  if(used>0){advances.push({id:x.id,valor:Number(used.toFixed(2))});remaining-=used}
+ });
+ return {items,advances,adjustment,gross,net:Math.max(0,remaining)};
+}
+function calcCommissionDraft(){
+ try{if(!$('closeTotals'))return;const x=collectDraft();$('closeTotals').textContent='Bruto '+fmt(x.gross)+' · Vales '+fmt(x.advances.reduce((sum,a)=>sum+a.valor,0))+' · Líquido '+fmt(x.net)}
+ catch(e){if($('closeTotals'))$('closeTotals').textContent=e.message}
+}
+
 function openPage(p){page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
 $('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=loadPage;document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
 const range=dates();$('start').value=range.start;$('end').value=range.end;
