@@ -1,0 +1,20 @@
+{
+  "id": "/mobile/",
+  "name": "Studio Essence",
+  "short_name": "Studio Essence",
+  "description": "Studio Essence Gestão Mobile",
+  "start_url": "/mobile/",
+  "scope": "/mobile/",
+  "display": "standalone",
+  "background_color": "#F8F1E5",
+  "theme_color": "#073E28",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
