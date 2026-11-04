@@ -148,58 +148,7 @@ if(page==='accounts'){await loadMobileFinance('accounts');return;}
 
 let financeMode='',financeTab='',financeBank=null,financeProfessionals=[],commissionDraft=null,financeBusy=false;
 const euro=x=>Number(x||0);
-const moneyInput=id=>{const raw=String($(id)?.value||'').replace(/\s/g,'').replace('R{page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
-$('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=loadPage;document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
-const range=dates();$('start').value=range.start;$('end').value=range.end;
-function standalone(){return window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}
-function isIOS(){return /iPhone|iPad|iPod/i.test(navigator.userAgent)}
-function isAndroid(){return /Android/i.test(navigator.userAgent)}
-function updateInstall(){const show=!standalone()&&!sessionStorage.getItem('studioInstallCompleted');['installLogin','installHome'].forEach(id=>$(id).classList.toggle('hidden',!show))}
-function steps(items){return '<ol>'+items.map(t=>'<li><span>'+t+'</span></li>').join('')+'</ol>'}
-function openInstallHelp(){
- const content=$('installHelpContent'),native=$('installNativeBtn');
- native.classList.add('hidden');
- if(isIOS()){
-   content.innerHTML='<p class="guide-label">No iPhone / iPad</p>'+steps(['Abra o Studio Essence pelo <strong>Safari</strong>.','Toque em <strong>Compartilhar</strong> (ícone de quadrado com seta para cima).','Escolha <strong>Adicionar à Tela de Início</strong>.','Se disponível, ative <strong>Abrir como App da Web</strong> e toque em <strong>Adicionar</strong>.'])+'<div class="tip">Depois, abra o Studio Essence pelo novo ícone na tela inicial do aparelho.</div>';
- }else if(isAndroid()){
-   content.innerHTML='<p class="guide-label">No Android</p>'+steps(['Abra o Studio Essence no <strong>Chrome</strong>.','Toque em <strong>Instalar agora</strong> abaixo, se disponível.','Caso a opção não apareça, abra o menu <strong>⋮</strong> do navegador e escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong>.','Confirme a instalação e abra o app pelo ícone <strong>Studio Essence</strong>.'])+'<div class="tip">Ao abrir pelo ícone instalado, o convite para instalação será ocultado.</div>';
-   if(installedPrompt)native.classList.remove('hidden');
- }else{
-   content.innerHTML='<p class="guide-label">No computador</p>'+steps(['Abra o Studio Essence no Chrome ou Edge.','Clique no ícone de instalação na barra de endereço ou procure <strong>Instalar aplicativo</strong> no menu do navegador.','Confirme para adicionar o aplicativo.']);
-   if(installedPrompt)native.classList.remove('hidden');
- }
- $('installModal').classList.remove('hidden');
- $('installClose').focus();
-}
-function closeInstallHelp(){$('installModal').classList.add('hidden')}
-async function triggerNativeInstall(){
- if(!installedPrompt)return;
- const prompt=installedPrompt; installedPrompt=null;
- await prompt.prompt();const answer=await prompt.userChoice;
- if(answer?.outcome==='accepted'){closeInstallHelp();updateInstall()}
-}
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installedPrompt=e;updateInstall()});
-window.addEventListener('appinstalled',()=>{sessionStorage.setItem('studioInstallCompleted','1');installedPrompt=null;closeInstallHelp();updateInstall()});
-document.querySelectorAll('[data-install-open]').forEach(btn=>btn.addEventListener('click',openInstallHelp));
-$('installClose').onclick=closeInstallHelp;$('installDoneBtn').onclick=closeInstallHelp;
-$('installNativeBtn').onclick=triggerNativeInstall;
-$('installModal').addEventListener('click',e=>{if(e.target===$('installModal'))closeInstallHelp()});
-window.addEventListener('keydown',e=>{if(e.key==='Escape')closeInstallHelp()});
-updateInstall();
-if('serviceWorker' in navigator){
- navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
-   reg.update().catch(()=>{});
-   document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{})});
- }).catch(()=>{});
- let updated=false;
- navigator.serviceWorker.addEventListener('controllerchange',()=>{
-   if(updated)return;
-   updated=true;
-   location.reload();
- });
-}
-})();
-</script></body></html>,'');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)};
+const moneyInput=id=>{const raw=String($(id)?.value||'').replace(/\s/g,'').replace('R$','');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)};
 const gv=id=>String($(id)?.value||'').trim();
 const acctOptions=(selected='',blank=true)=> (blank?'<option value="">Selecione uma conta</option>':'')+(financeBank?.accounts||[]).filter(a=>String(a.ativo)!=='false'&&String(a.ativo)!=='0').map(a=>'<option value="'+escapeText(a.id)+'" '+(String(a.id)===String(selected)?'selected':'')+'>'+escapeText(a.nome)+'</option>').join('');
 const profOptions=(selected='')=>'<option value="">Selecione a profissional</option>'+financeProfessionals.map(p=>'<option value="'+escapeText(p.id)+'" '+(String(p.id)===String(selected)?'selected':'')+'>'+escapeText(p.nome)+'</option>').join('');
