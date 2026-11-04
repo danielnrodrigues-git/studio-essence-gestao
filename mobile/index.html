@@ -73,15 +73,16 @@
 <div class="filter-row"><input type="date" id="start" aria-label="Data inicial"><input type="date" id="end" aria-label="Data final"></div>
 <button class="secondary full" id="search">Atualizar consulta</button><div id="results" aria-live="polite"></div>
 <p class="hint">Para operações de escrita ainda não adaptadas ao mobile, use o sistema desktop. Não há lançamento offline.</p></div>
+<p class="version" style="text-align:center">Studio Essence · Mobile V1 · Staging <span id="spinner"></span></p>
+<nav class="bottom"><button class="active" id="navHome"><span>⌂</span>Início</button><button data-page="commissions"><span>◈</span>Comissões</button><button data-page="cash"><span>⇄</span>Caixa</button><button data-page="expenses"><span>▤</span>Despesas</button><button data-page="accounts"><span>▣</span>Contas</button></nav>
+</main>
 <div id="installModal" class="install-modal hidden" role="dialog" aria-modal="true" aria-labelledby="installModalTitle">
 <div class="install-modal-sheet">
 <div class="install-modal-head"><div class="install-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 18h4"/></svg></div><div><h2 id="installModalTitle">Instalar Studio Essence</h2><p>Sua gestão sempre à mão.</p></div><button type="button" id="installClose" aria-label="Fechar instruções">×</button></div>
 <div id="installHelpContent" class="install-guide"></div>
 <button type="button" class="primary full hidden" id="installNativeBtn">Instalar agora</button>
 <button type="button" class="secondary full" id="installDoneBtn" style="margin-top:10px">Entendi</button>
-</div></div><p class="version" style="text-align:center">Studio Essence · Mobile V1 · Staging <span id="spinner"></span></p>
-<nav class="bottom"><button class="active" id="navHome"><span>⌂</span>Início</button><button data-page="commissions"><span>◈</span>Comissões</button><button data-page="cash"><span>⇄</span>Caixa</button><button data-page="expenses"><span>▤</span>Despesas</button><button data-page="accounts"><span>▣</span>Contas</button></nav>
-</main>
+</div></div>
 <script>
 (()=>{'use strict';
 const URL='https://mvtwejkxjrxbsuteemxj.supabase.co/functions/v1/studio-rpc',KEY='sb_publishable_5_9EXWhYi0MRxN4yJvRpwQ_xjmIKoxM';
