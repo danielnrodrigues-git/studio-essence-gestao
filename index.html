@@ -693,45 +693,97 @@ body{background:#f8f1e5!important;color:#173629}
   #appView #adminKpis .v2-kpi-comparison{font-size:10px!important}
 }
 </style>
-<style id="studio-login-redesign-hf16">
-#loginView.login-wrap{min-height:100dvh;padding:clamp(16px,4vw,48px);background:radial-gradient(ellipse at 15% 15%,#fbf0f1 0%,transparent 55%),linear-gradient(135deg,#f9f5f2 0%,#f2e9e9 100%);overflow-y:auto}
-#loginView .login-card{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);width:min(940px,100%);min-height:550px;padding:0;border:1px solid #eadbd6;border-radius:26px;overflow:hidden;box-shadow:0 26px 75px rgba(69,25,41,.13),0 3px 12px rgba(69,25,41,.04)}
-#loginView .login-identity{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(145deg,#68152d 0%,#58152a 60%,#3c1022 100%);padding:42px 39px 30px;color:#fff}
-#loginView .login-identity::before{content:"";position:absolute;z-index:-1;right:-155px;top:-165px;width:390px;height:390px;border-radius:50%;border:1px solid rgba(245,224,196,.16);box-shadow:0 0 0 65px rgba(255,255,255,.018),0 0 0 135px rgba(255,255,255,.018)}
-#loginView .login-identity-glow{position:absolute;inset:auto -100px -180px auto;width:420px;height:420px;background:radial-gradient(circle,rgba(183,108,125,.2),transparent 68%);pointer-events:none}
-#loginView .login-identity-inner{position:relative;margin:auto 0}
-#loginView .login-brand-image{display:block;width:min(100%,250px);height:auto;max-height:245px;object-fit:contain;object-position:left center;margin:0 0 22px -6px}
-#loginView .login-identity-divider{width:42px;height:2px;background:#ddbb8f;margin:8px 0 25px}
-#loginView .login-identity-eyebrow{font-size:10px;letter-spacing:.26em;font-weight:800;color:#e9cbbd;margin:0 0 13px}
-#loginView .login-identity h2{font-family:Georgia,serif;font-weight:400;font-size:clamp(24px,2.5vw,32px);line-height:1.2;letter-spacing:-.02em;margin:0 0 15px;color:#fff}
-#loginView .login-identity-support{font-size:13px;line-height:1.7;max-width:310px;color:#f0d9df;margin:0}
-#loginView .login-identity-bottom{position:relative;letter-spacing:.18em;font-weight:600;font-size:9px;color:#d5b5bf}
-#loginView .login-form-pane{display:flex;flex-direction:column;justify-content:center;background:#fffdfc;padding:50px clamp(26px,5vw,61px) 29px;min-width:0}
-#loginView .login-intro{display:flex;gap:9px;align-items:center;color:#7f3850;font-size:10px;letter-spacing:.2em;font-weight:800;margin-bottom:17px}
-#loginView .login-intro-mark{width:7px;height:7px;border-radius:50%;background:#a57076;box-shadow:0 0 0 4px #f7ebed}
-#loginView .login-title{font-family:Georgia,serif;font-size:clamp(28px,3vw,36px);letter-spacing:-.03em;line-height:1.15;font-weight:400;color:#42192b;margin:0 0 10px}
-#loginView .login-subtitle{color:#81747a;font-size:13px;line-height:1.6;margin:0 0 35px}
+<style id="studio-login-redesign-hf17">
+/* V2 staging · verde esmeralda, creme e champagne. Escopo exclusivo: login. */
+#loginView.login-wrap{
+ min-height:100dvh;padding:clamp(16px,4vw,48px);overflow-y:auto;
+ background:radial-gradient(ellipse at 12% 10%,#fffaf0 0%,transparent 58%),linear-gradient(135deg,#f8f1e5 0%,#eee3ce 100%);
+}
+#loginView .login-card{
+ display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);
+ width:min(940px,100%);min-height:550px;padding:0;overflow:hidden;
+ border:1px solid #e2d2b6;border-radius:26px;
+ box-shadow:0 26px 65px rgba(12,55,34,.13),0 3px 12px rgba(12,55,34,.04);
+}
+#loginView .login-identity{
+ position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;
+ padding:32px 39px 29px;color:#fff9ed;
+ background:linear-gradient(145deg,#075033 0%,#073e28 55%,#022e1d 100%);
+}
+#loginView .login-identity::before{
+ content:"";position:absolute;z-index:-1;right:-155px;top:-165px;width:390px;height:390px;
+ border-radius:50%;border:1px solid rgba(236,212,158,.18);
+ box-shadow:0 0 0 65px rgba(244,225,182,.018),0 0 0 135px rgba(244,225,182,.02);
+}
+#loginView .login-identity-glow{
+ position:absolute;inset:auto -100px -180px auto;width:420px;height:420px;
+ background:radial-gradient(circle,rgba(174,150,82,.16),transparent 68%);pointer-events:none;
+}
+#loginView .login-identity-inner{position:relative;margin:auto 0;width:100%;min-width:0}
+#loginView .login-brand-image{
+ display:block;width:clamp(185px,62%,238px);height:auto;max-height:220px;
+ object-fit:contain;object-position:center;margin:0 auto 24px;
+}
+#loginView .login-identity-divider{width:43px;height:2px;background:#d6b06b;margin:0 0 22px}
+#loginView .login-identity-eyebrow{font-size:10px;letter-spacing:.23em;font-weight:800;color:#e6d2a9;margin:0 0 12px}
+#loginView .login-identity h2{
+ font-family:Georgia,serif;font-weight:400;font-size:clamp(24px,2.5vw,31px);
+ line-height:1.2;letter-spacing:-.02em;margin:0 0 15px;color:#fff9ed;
+}
+#loginView .login-identity-support{font-size:13px;line-height:1.65;max-width:320px;color:#e5e9d9;margin:0}
+#loginView .login-identity-bottom{position:relative;letter-spacing:.17em;font-weight:600;font-size:9px;color:#d9c99e}
+#loginView .login-form-pane{
+ display:flex;flex-direction:column;justify-content:center;min-width:0;
+ background:#fffaf1;padding:50px clamp(26px,5vw,61px) 29px;
+}
+#loginView .login-intro{display:flex;gap:9px;align-items:center;color:#1a6846;font-size:10px;letter-spacing:.2em;font-weight:800;margin-bottom:17px}
+#loginView .login-intro-mark{width:7px;height:7px;border-radius:50%;background:#b9954b;box-shadow:0 0 0 4px #f4e7c9}
+#loginView .login-title{
+ font-family:Georgia,serif;font-size:clamp(28px,3vw,36px);letter-spacing:-.03em;
+ line-height:1.15;font-weight:400;color:#073e28;margin:0 0 10px;
+}
+#loginView .login-subtitle{color:#69746a;font-size:13px;line-height:1.6;margin:0 0 35px}
 #loginView .field{gap:9px;margin-bottom:19px}
-#loginView .field label{font-size:12px;color:#50464a;font-weight:700}
-#loginView .field input{height:48px;border-radius:11px;border:1px solid #e7dfe0;background:#fff;padding:0 14px;color:#37252e;font-size:14px;box-shadow:none;transition:border-color .2s,box-shadow .2s}
-#loginView .field input::placeholder{color:#b5a8ad}
-#loginView .field input:focus{border-color:#9a4f66;box-shadow:0 0 0 3px rgba(137,54,82,.11)}
+#loginView .field label{font-size:12px;color:#284536;font-weight:700}
+#loginView .field input{
+ height:48px;border-radius:11px;border:1px solid #e2d5bb;background:#fffdf8;
+ padding:0 14px;color:#193f2b;font-size:14px;box-shadow:none;
+ transition:border-color .2s,box-shadow .2s;
+}
+#loginView .field input::placeholder{color:#97a096}
+#loginView .field input:focus{border-color:#b99650;box-shadow:0 0 0 3px rgba(191,155,82,.17)}
 #loginView .login-pin-wrap{position:relative}
 #loginView .login-pin-wrap input{padding-right:53px}
-#loginView .login-eye-btn{display:flex;align-items:center;justify-content:center;position:absolute;top:5px;right:5px;width:38px;height:38px;border:none;background:transparent;border-radius:9px;cursor:pointer;color:#8b7c81}
-#loginView .login-eye-btn:hover{background:#f7eff1;color:#68152d}
-#loginView #loginBtn{height:49px;margin-top:6px;border-radius:11px;background:linear-gradient(100deg,#832344,#62162f);box-shadow:0 8px 17px rgba(112,31,60,.18);font-weight:750;font-size:14px}
+#loginView .login-eye-btn{
+ display:flex;align-items:center;justify-content:center;position:absolute;top:5px;right:5px;
+ width:38px;height:38px;border:none;background:transparent;border-radius:9px;cursor:pointer;color:#62786a;
+}
+#loginView .login-eye-btn:hover{background:#f1e8d4;color:#075033}
+#loginView #loginBtn{
+ height:49px;margin-top:6px;border-radius:11px;
+ background:linear-gradient(105deg,#0d5a39,#064229)!important;color:#fffaf0!important;
+ box-shadow:0 8px 17px rgba(6,66,41,.18);font-weight:750;font-size:14px;
+}
+#loginView #loginBtn:hover{background:linear-gradient(105deg,#116945,#075036)!important}
 #loginView #loginBtn:disabled{opacity:.75;cursor:wait;transform:none}
-#loginView #openActivationBtn,#loginView #activationBackBtn{background:transparent!important;color:#79334c!important;box-shadow:none!important;font-weight:650;font-size:12px;margin-top:9px!important}
+#loginView #openActivationBtn,#loginView #activationBackBtn{
+ background:transparent!important;color:#0a5939!important;box-shadow:none!important;
+ font-weight:650;font-size:12px;margin-top:9px!important;
+}
 #loginView #openActivationBtn:hover,#loginView #activationBackBtn:hover{text-decoration:underline;transform:none}
-#loginView .login-footer{margin-top:auto;padding-top:35px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:7px;text-align:center;font-size:10px;color:#988c91}
-#loginView .login-footer-dot{color:#d6c7cc}
-#loginView #loginError:not(:empty){margin-top:8px;padding:11px;border-radius:9px;background:#fff1f2;color:#9f263e;font-size:12px}
-#loginView #bootstrapBox h3,#loginView #activationBox h3{font-family:Georgia,serif;color:#42192b;font-size:23px;font-weight:400}
+#loginView .login-footer{
+ margin-top:auto;padding-top:35px;display:flex;flex-wrap:wrap;align-items:center;
+ justify-content:center;gap:7px;text-align:center;font-size:10px;color:#879083;
+}
+#loginView .login-footer-dot{color:#c4b18f}
+#loginView #loginError:not(:empty){margin-top:8px;padding:11px;border-radius:9px;background:#fff1ee;color:#94344a;font-size:12px}
+#loginView #bootstrapBox h3,#loginView #activationBox h3{
+ font-family:Georgia,serif;color:#073e28;font-size:23px;font-weight:400;
+}
 @media(max-width:730px){
  #loginView.login-wrap{padding:12px;align-items:start}
  #loginView .login-card{grid-template-columns:1fr;min-height:0;max-width:500px;margin:auto}
- #loginView .login-identity{padding:15px 25px;min-height:125px}
+ #loginView .login-identity{padding:14px 25px;min-height:125px}
  #loginView .login-identity-inner{margin:0}
  #loginView .login-brand-image{width:145px;max-height:98px;margin:0 auto;object-position:center}
  #loginView .login-identity-divider,#loginView .login-identity-eyebrow,#loginView .login-identity h2,#loginView .login-identity-support,#loginView .login-identity-bottom{display:none}
@@ -739,7 +791,14 @@ body{background:#f8f1e5!important;color:#173629}
  #loginView .login-subtitle{margin-bottom:25px}
  #loginView .login-footer{padding-top:22px}
 }
-@media(max-height:620px) and (min-width:731px){#loginView.login-wrap{padding:12px}#loginView .login-card{min-height:0}#loginView .login-identity{padding-top:20px;padding-bottom:20px}#loginView .login-form-pane{padding-top:24px;padding-bottom:20px}#loginView .login-subtitle{margin-bottom:19px}}
+@media(max-height:620px) and (min-width:731px){
+ #loginView.login-wrap{padding:12px}
+ #loginView .login-card{min-height:0}
+ #loginView .login-identity{padding-top:20px;padding-bottom:20px}
+ #loginView .login-brand-image{max-height:150px;width:190px;margin-bottom:13px}
+ #loginView .login-form-pane{padding-top:24px;padding-bottom:20px}
+ #loginView .login-subtitle{margin-bottom:19px}
+}
 </style>
 </head>
 <body>
