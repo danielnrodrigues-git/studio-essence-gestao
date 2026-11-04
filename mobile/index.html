@@ -163,7 +163,7 @@ function confirmWrite(message){if(!navigator.onLine)throw Error('É necessário 
 async function safeWrite(fn,success,refresh){
  if(financeBusy)return;
  financeBusy=true;document.querySelectorAll('[data-finance]').forEach(x=>x.disabled=true);
- try{await fn();vmsg(success);if(refresh)await refresh();}
+ try{await fn();if(refresh)await refresh();vmsg(success);}
  catch(e){vmsg(e.message||String(e),true)}
  finally{financeBusy=false;document.querySelectorAll('[data-finance]').forEach(x=>x.disabled=false)}
 }
@@ -274,7 +274,7 @@ async function renderBankTab(tab){
     panel('Transferências do período',rows.map(x=>item((x.conta_origem_nome||'Origem')+' → '+(x.conta_destino_nome||'Destino'),(x.data||'')+' · '+(x.descricao||''),fmt(x.valor))).join('')||'<p class="notice">Nenhuma transferência no período.</p>');
  }
  if(tab==='contrib'){
-  $('financeBody').innerHTML=panel('Registrar aporte',fld('conDate','Data','date',d.end)+choose('conAccount','Conta de destino',acctOptions())+fld('conValue','Valor (R$)','number','','min="0.01" step="0.01" inputmode="decimal"')+fld('conDesc','Descrição')+act('saveContribution','Registrar aporte')+'<p class="mobile-form-note">Aporte é uma entrada de recursos do sócio e não deve ser confundido com faturamento.</p>');
+  $('financeBody').innerHTML=panel('Registrar aporte',fld('conDate','Data','date',d.end)+choose('conAccount','Conta de destino',acctOptions())+fld('conValue','Valor (R$)','number','','min="0.01" step="0.01" inputmode="decimal"')+fld('conDesc','Descrição')+act('saveContribution','Registrar aporte')+'<p class="mobile-form-note">Aporte é uma entrada de recursos do sócio e não deve ser confundido com faturamento. Para dinheiro já registrado em outra conta do Studio, use Transferência, não Aporte.</p>');
  }
  if(tab==='account'){
   const edit=window.mobileEditAccount||null;
