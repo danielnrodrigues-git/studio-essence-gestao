@@ -1210,14 +1210,14 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
  'use strict';
  // Explicit Unicode escapes prevent emoji loss during intermediate source encodings.
  function birthdayMessage(client,campaign){
-   var heart='\\uD83D\\uDC95';
+   var heart='\uD83D\uDC95';
    var msg='Oi, '+String(client.nome||'').trim()+'! '+heart+
      ' Seu mês chegou! O Studio Essence deseja um aniversário cheio de beleza, cuidado e momentos especiais.';
    if(campaign){
-     msg+='\\n\\nTemos uma condição especial para você: '+String(campaign.nome||'')+
+     msg+='\n\nTemos uma condição especial para você: '+String(campaign.nome||'')+
        (campaign.descricao?' — '+String(campaign.descricao):'')+'.';
    }
-   return msg+'\\n\\nStudio Essence '+heart;
+   return msg+'\n\nStudio Essence '+heart;
  }
  function launchBirthdayWhatsApp(clientId){
    var all=[...((STATE.data&&STATE.data.allClients)||[]),...((STATE.data&&STATE.data.clients)||[])];
@@ -1225,7 +1225,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
    if(!client)return;
    var campaignId=document.getElementById('birthdayCampaign')?.value||'';
    var campaign=((STATE.data&&STATE.data.campaigns)||[]).find(function(c){return String(c.id)===String(campaignId);});
-   var phone=String(client.telefone||'').replace(/\\D/g,'');
+   var phone=String(client.telefone||'').replace(/\D/g,'');
    if(phone&&phone.length<=11)phone='55'+phone;
    var message=birthdayMessage(client,campaign);
    window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
