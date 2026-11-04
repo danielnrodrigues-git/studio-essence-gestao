@@ -41,7 +41,7 @@
 .bottom .bottom-icon svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .bottom button{padding:6px 3px;min-height:49px;justify-content:center}
 .action:active{background:#F8F1E5}
-</style></head><body>
+.cash-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:16px 0}.cash-totals>div{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:13px;min-width:0}.cash-totals>div:last-child{grid-column:1/-1}.cash-totals small{display:block;color:var(--muted);font-size:11px;margin-bottom:7px}.cash-totals strong{display:block;color:var(--deep);font-size:17px;overflow-wrap:anywhere}</style></head><body>
 <section id="login" class="login-screen">
 <div id="installLogin" class="install-banner hidden" role="region" aria-label="Instalar Studio Essence">
   <div class="install-banner-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 18h4"/></svg></div>
@@ -108,7 +108,25 @@ const sections={commissions:'Comissões',cash:'Fluxo de Caixa',expenses:'Despesa
 async function loadPage(){if(page==='home')return homeData();$('results').innerHTML='<p class="notice">Consultando dados…</p>';status('Consultando…');try{
 const params={start:$('start').value,end:$('end').value};let records=[];
 if(page==='commissions'){records=await rpc('apiCommissionHistory',token,{profissional_id:'',...params,status:''});$('results').innerHTML=(records||[]).map(x=>item(x.profissional_nome||x.profissional||nameOf(x),(x.periodo_inicio||x.inicio||'')+' · '+(x.status||''),fmt(x.liquido||x.valor_liquido||x.valor))).join('')||'<p class="notice">Nenhuma comissão no período.</p>'}
-if(page==='cash'){records=await rpc('apiCashFlow',token,{...params,includeForecast:false});$('results').innerHTML=(records||[]).map(x=>item(x.descricao||x.tipo,x.data+' · '+(x.forma||'')+' · '+(x.status||''),fmt(x.valor))).join('')||'<p class="notice">Nenhuma movimentação no período.</p>'}
+if(page==='cash'){
+ const response=await rpc('apiCashFlowV180',token,{...params,includeForecast:false});
+ if(!response||!Array.isArray(response.rows))throw Error('A consulta do Fluxo de Caixa retornou um formato inesperado. Tente atualizar a consulta.');
+ records=response.rows;
+ const summary=response.summaryHF1||{};
+ const realized=records.filter(x=>x.status==='REALIZADO');
+ const entrySum=realized.filter(x=>Number(x.valor)>=0).reduce((sum,x)=>sum+Number(x.valor||0),0);
+ const exitSum=realized.filter(x=>Number(x.valor)<0).reduce((sum,x)=>sum+Math.abs(Number(x.valor||0)),0);
+ const totals='<div class="cash-totals">'+
+   '<div><small>Entradas realizadas</small><strong>'+fmt(summary.entries??entrySum)+'</strong></div>'+
+   '<div><small>Saídas realizadas</small><strong>'+fmt(summary.exits??exitSum)+'</strong></div>'+
+   '<div><small>Resultado realizado</small><strong>'+fmt(summary.result??(entrySum-exitSum))+'</strong></div>'+
+   '</div>';
+ $('results').innerHTML=totals+(records.map(x=>item(
+   x.descricao||x.tipo||'Movimentação',
+   [x.data,x.tipo,x.forma,x.status].filter(Boolean).join(' · '),
+   fmt(x.valor)
+ )).join('')||'<p class="notice">Nenhuma movimentação no período.</p>');
+}
 if(page==='expenses'){records=await rpc('apiListExpenses',token,{...params,status:''});$('results').innerHTML=(records||[]).map(x=>item(x.descricao,x.vencimento+' · '+(x.status||'')+' · '+(x.categoria||''),fmt(x.valor))).join('')||'<p class="notice">Nenhuma despesa no período.</p>'}
 if(page==='accounts'){const b=await rpc('apiFinancialBootstrapV172',token);const accounts=b.accounts||[];const pos=b.position||{};$('results').innerHTML=accounts.map(a=>item(a.nome,a.tipo||'Conta financeira',fmt(a.saldo))).join('')+item('Saldo disponível','Posição consolidada',fmt(pos.available))||'<p class="notice">Nenhuma conta cadastrada.</p>'}
 }catch(e){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(e.message)+'</p>'}finally{status('')}}
