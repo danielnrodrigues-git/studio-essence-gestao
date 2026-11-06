@@ -1354,7 +1354,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   ['Data do reembolso','Compra original','Tipo','Valor','Situação','Ações'].forEach(function(t){var th=document.createElement('th');th.textContent=t;tr.appendChild(th);});head.appendChild(tr);table.appendChild(head);
   var body=document.createElement('tbody');
   rows.slice(0,60).forEach(function(r){
-    var tr=document.createElement('tr');var fields=[r.data_reembolso.split('-').reverse().join('/'),r.descricao,labelType(r.tipo),moneyHF19(r.valor),r.status==='ATIVO'&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id?'Aguardando fatura':r.status];
+    var tr=document.createElement('tr');var fields=[r.data_reembolso.split('-').reverse().join('/'),r.descricao,labelType(r.tipo),moneyHF19(r.valor),r.status==='ATIVO'&&r.recebido_em?'Recebido em '+String(r.recebido_em).split('-').reverse().join('/'):r.status==='ATIVO'&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id?'Aguardando crédito':r.status];
     fields.forEach(function(f){var td=document.createElement('td');td.textContent=f;tr.appendChild(td);});
     var td=document.createElement('td');
     td.className='refund-action-buttons';
@@ -1365,7 +1365,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
     var active=r.status==='ATIVO',received=!!r.recebido_em;
     act('edit','Editar',()=>window.studioRefundEditHF19(r.id),!active||received||!!r.parcela_cartao_id);
     act('receive',r.tipo==='PIX_DINHEIRO'||received?'Recebido':'Receber',()=>window.studioRefundReceiveHF19(r.id),!active||received||r.tipo!=='CREDITO_CARTAO');
-    act('cancel','Cancelar',()=>window.studioRefundCancelHF19(r.id),!active);
+    act('cancel','Cancelar',()=>window.studioRefundCancelHF19(r.id),!active||received);
     act('delete','Excluir',()=>window.studioRefundDeleteHF19(r.id),!active||received);
     if(active&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id){
      var sel=document.createElement('select');sel.style.maxWidth='195px';sel.style.marginLeft='5px';
@@ -1471,7 +1471,7 @@ tr.appendChild(td);body.appendChild(tr);
   var suggested=typeof isoToday==='function'?isoToday():new Date().toISOString().slice(0,10);
   var actual=prompt('Data em que o crédito apareceu efetivamente na fatura (AAAA-MM-DD):',suggested);
   if(actual===null)return;
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(actual)){msg('Informe a data no formato AAAA-MM-DD.');return;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(actual)){msg('Informe a data no formato AAAA-MM-DD.');return;}
   if(!confirm('Confirmar que o crédito de '+moneyHF19(r.valor)+' já apareceu na fatura? Não será criada entrada bancária.'))return;
   try{
    await gs('apiManageExpenseRefundV182',STATE.token,'RECEBER',id,{recebido_em:actual});
