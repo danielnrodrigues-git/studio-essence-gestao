@@ -834,11 +834,11 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
 <div class="card admin-only" id="refundSectionHF19" style="margin-bottom:14px">
  <div class="toolbar" style="justify-content:space-between;align-items:center;gap:12px">
   <div><h3 style="margin:0">Reembolsos de compras</h3><div class="tiny muted">Devoluções e estornos vinculados à despesa original, sem aumentar o faturamento de serviços.</div></div>
-  <button type="button" class="btn primary" onclick="studioRefundOpenHF19()">+ Registrar reembolso</button>
+  <button type="button" class="btn primary" onclick="studioRefundOpenHF19()">+ Cadastro de Reembolso</button>
  </div>
  <div id="refundHistoryHF19" class="tiny muted">Carregando lançamentos...</div>
 </div>
-<div class="card form-card admin-only"><h3>Nova despesa</h3><div class="form-grid">
+<div class="card form-card admin-only"><h3>Cadastro de Despesa</h3><div class="form-grid">
 <div class="field span2"><label>Descrição</label><input id="expDesc"/></div><div class="field"><label>Competência</label><input id="expBuy" type="date"/></div><div class="field"><label>Vencimento / 1ª fatura</label><input id="expDue" type="date"/></div>
 <div class="field"><label>Categoria</label><select id="expCat" onchange="updateExpenseSubcategories('new')"><option value="">Selecione...</option></select></div><div class="field hidden" id="expSubField"><label>Subcategoria</label><select id="expSub"><option value="">Selecione...</option></select></div><div class="field"><label>Valor total</label><input class="currency" id="expValue" inputmode="decimal" type="text" value="R$ 0,00"/></div><div class="field"><label>Forma de pagamento</label><select id="expPay"></select></div>
 <div class="field"><label>Parcelas</label><input id="expParcels" min="1" type="number" value="1"/></div><div class="field"><label>Status inicial</label><select id="expStatus"><option>PREVISTO</option><option>PAGO</option></select></div><div class="field"><label>Recorrente?</label><select id="expRecurring"><option value="false">Não</option><option value="true">Sim</option></select></div><div class="field"><label>Meses recorrentes</label><input id="expRecurringMonths" min="1" type="number" value="12"/></div>
@@ -1504,7 +1504,17 @@ tr.appendChild(td);body.appendChild(tr);
     if(typeof toast==='function')toast('Reembolso cancelado e movimentos revertidos.');
   }catch(e){msg(e.message);}
  };
+ function renameExpenseActionHF19(){
+  var root=dom('section-expenses');if(!root)return;
+  root.querySelectorAll('button').forEach(function(button){
+   if(/^\\+?\\s*cadastrar nova despesa$/i.test(button.textContent.trim())){
+    button.textContent='+ Cadastro de Despesa';
+   }
+  });
+ }
  function ready(){
+  renameExpenseActionHF19();
+  new MutationObserver(renameExpenseActionHF19).observe(dom('section-expenses'),{childList:true,subtree:true});
   dom('refundOriginalHF19').addEventListener('input',function(){state.selected=null;dom('refundExpenseSummaryHF19').textContent='Selecione uma opção abaixo do campo.';suggestions();});
   dom('refundOriginalHF19').addEventListener('change',function(){resolveTypedExpense();});
   dom('refundOriginalHF19').addEventListener('keydown',function(e){if(e.key==='Escape')closeSuggestions();if(e.key==='Enter'){
