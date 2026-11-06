@@ -1278,7 +1278,8 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
      <div class="refund-summary" id="refundExpenseSummaryHF19">Selecione a compra original.</div>
     </div>
     <div class="refund-field"><label for="refundTypeHF19">Tipo de reembolso *</label><select id="refundTypeHF19" onchange="studioRefundTypeHF19()"><option value="PIX_DINHEIRO">Pix / Dinheiro (conta financeira)</option><option value="CREDITO_CARTAO">Crédito na fatura do cartão</option><option value="CREDITO_FORNECEDOR">Crédito com fornecedor (sem entrada no caixa)</option></select></div>
-    <div class="refund-field"><label for="refundDateHF19">Data efetiva do reembolso *</label><input type="date" id="refundDateHF19" required/></div>
+    <div class="refund-field"><label for="refundDateHF19" id="refundDateLabelHF19">Data efetiva do reembolso *</label><input type="date" id="refundDateHF19" required/></div>
+    <div class="refund-field" id="refundCardDateWrapHF19" hidden><label for="refundCardDateHF19">Previsão do crédito na fatura *</label><input type="date" id="refundCardDateHF19"/></div>
     <div class="refund-field"><label for="refundValueHF19">Valor reembolsado (R$) *</label><input type="text" id="refundValueHF19" inputmode="decimal" placeholder="0,00" required/></div>
     <div class="refund-field" id="refundAccountWrapHF19"><label for="refundAccountHF19">Conta que recebeu o valor *</label><select id="refundAccountHF19"><option value="">Selecione a conta...</option></select></div>
     <div class="refund-field" id="refundFormWrapHF19"><label for="refundPaymentMethodHF19">Forma de recebimento</label><select id="refundPaymentMethodHF19"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Transferência">Transferência</option></select></div>
@@ -1345,7 +1346,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   if(!rows.length){host.textContent='Nenhum reembolso registrado. Use o botão para vincular uma devolução à compra original.';return;}
   var wrap=document.createElement('div');wrap.className='refund-table-wrap';var table=document.createElement('table');
   var head=document.createElement('thead'),tr=document.createElement('tr');
-  ['Data','Compra original','Tipo','Valor','Situação','Ações'].forEach(function(t){var th=document.createElement('th');th.textContent=t;tr.appendChild(th);});head.appendChild(tr);table.appendChild(head);
+  ['Data do reembolso','Compra original','Tipo','Valor','Situação','Ações'].forEach(function(t){var th=document.createElement('th');th.textContent=t;tr.appendChild(th);});head.appendChild(tr);table.appendChild(head);
   var body=document.createElement('tbody');
   rows.slice(0,60).forEach(function(r){
     var tr=document.createElement('tr');var fields=[r.data_reembolso.split('-').reverse().join('/'),r.descricao,labelType(r.tipo),moneyHF19(r.valor),r.status==='ATIVO'&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id?'Aguardando fatura':r.status];
@@ -1371,8 +1372,10 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   dom('refundAccountWrapHF19').hidden=t!=='PIX_DINHEIRO';
   dom('refundFormWrapHF19').hidden=t!=='PIX_DINHEIRO';
   dom('refundCardWrapHF19').hidden=t!=='CREDITO_CARTAO';
+  dom('refundCardDateWrapHF19').hidden=t!=='CREDITO_CARTAO';
+  dom('refundDateLabelHF19').textContent=t==='CREDITO_CARTAO'?'Data em que o fornecedor confirmou o reembolso *':'Data efetiva do reembolso *';
   dom('refundNoticeHF19').textContent=t==='PIX_DINHEIRO'?'Entrada financeira somente na conta selecionada, sem aumentar o faturamento de serviços.':
-   t==='CREDITO_CARTAO'?'O crédito abate a obrigação de cartão selecionada, sem gerar entrada bancária.':
+   t==='CREDITO_CARTAO'?'Registre a confirmação do reembolso e, separadamente, quando o crédito deverá aparecer na fatura. Não gera entrada bancária.':
    'Crédito reconhecido no histórico da compra, sem movimentar o caixa até sua utilização.';
  };
  window.studioRefundOpenHF19=async function(){
@@ -1383,6 +1386,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
    dom('refundExpenseSummaryHF19').textContent='Selecione a compra original.';
    dom('refundValueHF19').removeAttribute('max');
    dom('refundDateHF19').value=typeof isoToday==='function'?isoToday():new Date().toISOString().slice(0,10);
+   dom('refundCardDateHF19').value='';
    var accounts=dom('refundAccountHF19');clear(accounts);option(accounts,'','Selecione a conta...');
    state.data.accounts.forEach(x=>option(accounts,x.id,x.nome));
    var obligations=dom('refundCardHF19');clear(obligations);option(obligations,'','Selecione uma parcela pendente...');
@@ -1401,11 +1405,13 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   var exp=state.selected||resolveTypedExpense(),amount=parseMoneyHF19(value('refundValueHF19')),kind=value('refundTypeHF19');
   if(!exp){suggestions();msg('Escolha a compra original em uma das sugestões apresentadas abaixo do campo.');dom('refundOriginalHF19').focus();return;}
   if(!value('refundDateHF19')){msg('Informe a data efetiva do reembolso.');return;}
+  if(kind==='CREDITO_CARTAO'&&!value('refundCardDateHF19')){msg('Informe a previsão do crédito na fatura do cartão.');return;}
+  if(kind==='CREDITO_CARTAO'&&value('refundCardDateHF19')<value('refundDateHF19')){msg('A previsão do crédito não pode ser anterior à data do reembolso.');return;}
   if(!Number.isFinite(amount)||amount<=0||amount>cents(exp.disponivel)){msg('Valor inválido ou superior ao saldo da compra. Use 131,76 ou 131.76.');return;}
   var target=state.data.obligations.find(x=>x.parcela_id===value('refundCardHF19'));
   if(kind==='CREDITO_CARTAO'&&value('refundCardHF19')&&(!target||amount>target.valor)){msg('O crédito supera a obrigação de cartão escolhida.');return;}
   if(kind==='PIX_DINHEIRO'&&!value('refundAccountHF19')){msg('Selecione a conta que recebeu o reembolso.');return;}
-  var payload={chave_operacao:state.key,despesa_id:exp.id,tipo:kind,data_reembolso:value('refundDateHF19'),valor:amount,
+  var payload={chave_operacao:state.key,despesa_id:exp.id,tipo:kind,data_reembolso:value('refundDateHF19'),data_credito_fatura:kind==='CREDITO_CARTAO'?value('refundCardDateHF19'):null,valor:amount,
    conta_financeira_id:kind==='PIX_DINHEIRO'?value('refundAccountHF19'):null,
    forma_recebimento:kind==='PIX_DINHEIRO'?value('refundPaymentMethodHF19'):'',
    parcela_cartao_id:kind==='CREDITO_CARTAO'?value('refundCardHF19'):null,
