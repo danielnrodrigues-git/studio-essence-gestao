@@ -1281,7 +1281,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
     <div class="refund-field"><label for="refundDateHF19">Data efetiva do reembolso *</label><input type="date" id="refundDateHF19" required/></div>
     <div class="refund-field"><label for="refundValueHF19">Valor reembolsado (R$) *</label><input type="number" id="refundValueHF19" min="0.01" step="0.01" placeholder="0,00" required/></div>
     <div class="refund-field" id="refundAccountWrapHF19"><label for="refundAccountHF19">Conta que recebeu o valor *</label><select id="refundAccountHF19"><option value="">Selecione a conta...</option></select></div>
-    <div class="refund-field" id="refundFormWrapHF19"><label for="refundFormHF19">Forma de recebimento</label><select id="refundFormHF19"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Transferência">Transferência</option></select></div>
+    <div class="refund-field" id="refundFormWrapHF19"><label for="refundPaymentMethodHF19">Forma de recebimento</label><select id="refundPaymentMethodHF19"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Transferência">Transferência</option></select></div>
     <div class="refund-field refund-full" id="refundCardWrapHF19" hidden><label for="refundCardHF19">Aplicar crédito a uma obrigação de cartão (opcional)</label><select id="refundCardHF19"><option value="">Selecione a parcela pendente...</option></select><small>Sem parcela disponível? Deixe em branco. O crédito ficará aguardando uma futura fatura de cartão.</small></div>
     <div class="refund-field refund-full"><label for="refundReasonHF19">Motivo / fornecedor</label><input id="refundReasonHF19" maxlength="500" placeholder="Produto com defeito, devolvido ao fornecedor..."/></div>
     <div class="refund-field refund-full"><label for="refundNotesHF19">Observações (opcional)</label><textarea id="refundNotesHF19" rows="2" placeholder="Referência do estorno e eventual nova compra..."></textarea></div>
@@ -1392,7 +1392,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   if(kind==='PIX_DINHEIRO'&&!value('refundAccountHF19')){msg('Selecione a conta que recebeu o reembolso.');return;}
   var payload={chave_operacao:state.key,despesa_id:exp.id,tipo:kind,data_reembolso:value('refundDateHF19'),valor:amount,
    conta_financeira_id:kind==='PIX_DINHEIRO'?value('refundAccountHF19'):null,
-   forma_recebimento:kind==='PIX_DINHEIRO'?value('refundFormHF19'):'',
+   forma_recebimento:kind==='PIX_DINHEIRO'?value('refundPaymentMethodHF19'):'',
    parcela_cartao_id:kind==='CREDITO_CARTAO'?value('refundCardHF19'):null,
    motivo:value('refundReasonHF19'),observacoes:value('refundNotesHF19')};
   state.lock=true;dom('refundSubmitHF19').disabled=true;
