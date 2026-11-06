@@ -1313,6 +1313,17 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   dom('refundValueHF19').max=exp.disponivel;
   closeSuggestions();
  }
+ function resolveTypedExpense(){
+  if(state.selected)return state.selected;
+  if(!state.data||!Array.isArray(state.data.expenses))return null;
+  var typed=norm(value('refundOriginalHF19').trim());
+  if(!typed)return null;
+  var matches=state.data.expenses.filter(function(x){
+   return x.disponivel>0&&(norm(x.descricao)===typed||norm(x.descricao+' · '+x.data_compra)===typed);
+  });
+  if(matches.length!==1)return null;
+  pickExpense(matches[0]);return matches[0];
+ }
  function suggestions(){
   var m=dom('refundSuggestionsHF19'),q=norm(value('refundOriginalHF19').trim());
   clear(m);if(!q||!state.data){closeSuggestions();return;}
@@ -1384,8 +1395,8 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
  };
  window.studioRefundSaveHF19=async function(){
   if(state.lock)return;
-  var exp=state.selected,amount=cents(value('refundValueHF19')),kind=value('refundTypeHF19');
-  if(!exp){msg('Selecione a compra original na lista abaixo do campo.');return;}
+  var exp=state.selected||resolveTypedExpense(),amount=cents(value('refundValueHF19')),kind=value('refundTypeHF19');
+  if(!exp){suggestions();msg('Escolha a compra original em uma das sugestões apresentadas abaixo do campo.');dom('refundOriginalHF19').focus();return;}
   if(!Number.isFinite(amount)||amount<=0||amount>cents(exp.disponivel)){msg('Valor inválido ou superior ao saldo da compra.');return;}
   var target=state.data.obligations.find(x=>x.parcela_id===value('refundCardHF19'));
   if(kind==='CREDITO_CARTAO'&&value('refundCardHF19')&&(!target||amount>target.valor)){msg('O crédito supera a obrigação de cartão escolhida.');return;}
@@ -1423,6 +1434,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
  };
  function ready(){
   dom('refundOriginalHF19').addEventListener('input',function(){state.selected=null;dom('refundExpenseSummaryHF19').textContent='Selecione uma opção abaixo do campo.';suggestions();});
+  dom('refundOriginalHF19').addEventListener('change',function(){resolveTypedExpense();});
   dom('refundOriginalHF19').addEventListener('keydown',function(e){if(e.key==='Escape')closeSuggestions();if(e.key==='Enter'){
     var first=dom('refundSuggestionsHF19').querySelector('button');if(first&&!dom('refundSuggestionsHF19').hidden){e.preventDefault();first.click();}
   }});
