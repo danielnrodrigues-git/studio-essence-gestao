@@ -1282,7 +1282,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
     <div class="refund-field"><label for="refundValueHF19">Valor reembolsado (R$) *</label><input type="number" id="refundValueHF19" min="0.01" step="0.01" placeholder="0,00" required/></div>
     <div class="refund-field" id="refundAccountWrapHF19"><label for="refundAccountHF19">Conta que recebeu o valor *</label><select id="refundAccountHF19"><option value="">Selecione a conta...</option></select></div>
     <div class="refund-field" id="refundFormWrapHF19"><label for="refundFormHF19">Forma de recebimento</label><select id="refundFormHF19"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Transferência">Transferência</option></select></div>
-    <div class="refund-field refund-full" id="refundCardWrapHF19" hidden><label for="refundCardHF19">Obrigação de cartão a abater *</label><select id="refundCardHF19"><option value="">Selecione a parcela pendente...</option></select><small>É possível vincular o crédito a outra compra no cartão, desde que a obrigação ainda esteja pendente.</small></div>
+    <div class="refund-field refund-full" id="refundCardWrapHF19" hidden><label for="refundCardHF19">Aplicar crédito a uma obrigação de cartão (opcional)</label><select id="refundCardHF19"><option value="">Selecione a parcela pendente...</option></select><small>Sem parcela disponível? Deixe em branco. O crédito ficará aguardando uma futura fatura de cartão.</small></div>
     <div class="refund-field refund-full"><label for="refundReasonHF19">Motivo / fornecedor</label><input id="refundReasonHF19" maxlength="500" placeholder="Produto com defeito, devolvido ao fornecedor..."/></div>
     <div class="refund-field refund-full"><label for="refundNotesHF19">Observações (opcional)</label><textarea id="refundNotesHF19" rows="2" placeholder="Referência do estorno e eventual nova compra..."></textarea></div>
    </div>
@@ -1335,9 +1335,16 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   ['Data','Compra original','Tipo','Valor','Situação','Ações'].forEach(function(t){var th=document.createElement('th');th.textContent=t;tr.appendChild(th);});head.appendChild(tr);table.appendChild(head);
   var body=document.createElement('tbody');
   rows.slice(0,60).forEach(function(r){
-    var tr=document.createElement('tr');var fields=[r.data_reembolso.split('-').reverse().join('/'),r.descricao,labelType(r.tipo),moneyHF19(r.valor),r.status];
+    var tr=document.createElement('tr');var fields=[r.data_reembolso.split('-').reverse().join('/'),r.descricao,labelType(r.tipo),moneyHF19(r.valor),r.status==='ATIVO'&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id?'Aguardando fatura':r.status];
     fields.forEach(function(f){var td=document.createElement('td');td.textContent=f;tr.appendChild(td);});
-    var td=document.createElement('td');if(r.status==='ATIVO'){
+    var td=document.createElement('td');if(r.status==='ATIVO'&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id){
+     var sel=document.createElement('select');sel.style.maxWidth='200px';sel.style.marginRight='7px';
+     option(sel,'','Aplicar em fatura...');
+     state.data.obligations.forEach(o=>{if(o.valor>=Number(r.valor))option(sel,o.parcela_id,o.descricao+' · '+moneyHF19(o.valor));});
+     var apply=document.createElement('button');apply.type='button';apply.className='btn soft small';apply.textContent='Aplicar';
+     apply.addEventListener('click',()=>window.studioRefundApplyHF19(r.id,sel.value));
+     td.appendChild(sel);td.appendChild(apply);
+    }if(r.status==='ATIVO'){
       var button=document.createElement('button');button.className='btn soft small';button.type='button';button.textContent='Cancelar';
       button.addEventListener('click',()=>window.studioRefundCancelHF19(r.id));td.appendChild(button);
     }tr.appendChild(td);body.appendChild(tr);
@@ -1381,7 +1388,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
   if(!exp){msg('Selecione a compra original na lista abaixo do campo.');return;}
   if(!Number.isFinite(amount)||amount<=0||amount>cents(exp.disponivel)){msg('Valor inválido ou superior ao saldo da compra.');return;}
   var target=state.data.obligations.find(x=>x.parcela_id===value('refundCardHF19'));
-  if(kind==='CREDITO_CARTAO'&&(!target||amount>target.valor)){msg('Selecione uma obrigação de cartão com saldo suficiente.');return;}
+  if(kind==='CREDITO_CARTAO'&&value('refundCardHF19')&&(!target||amount>target.valor)){msg('O crédito supera a obrigação de cartão escolhida.');return;}
   if(kind==='PIX_DINHEIRO'&&!value('refundAccountHF19')){msg('Selecione a conta que recebeu o reembolso.');return;}
   var payload={chave_operacao:state.key,despesa_id:exp.id,tipo:kind,data_reembolso:value('refundDateHF19'),valor:amount,
    conta_financeira_id:kind==='PIX_DINHEIRO'?value('refundAccountHF19'):null,
@@ -1397,6 +1404,15 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
    if(typeof toast==='function')toast('Reembolso registrado e conciliável pelo movimento correspondente.');
   }catch(e){msg('Falha ao registrar reembolso: '+e.message);}
   finally{state.lock=false;dom('refundSubmitHF19').disabled=false;}
+ };
+ window.studioRefundApplyHF19=async function(id,parcelId){
+  if(!parcelId){msg('Selecione uma obrigação de cartão com saldo suficiente.');return;}
+  if(!confirm('Aplicar este crédito à obrigação de cartão selecionada?'))return;
+  try{
+    await gs('apiApplyExpenseCardCreditV181',STATE.token,id,parcelId);
+    await fetchData();if(typeof refreshData==='function')await refreshData();
+    if(typeof toast==='function')toast('Crédito aplicado à obrigação de cartão.');
+  }catch(e){msg(e.message);}
  };
  window.studioRefundCancelHF19=async function(id){
   if(!confirm('Cancelar este reembolso? Somente movimentos não conciliados podem ser cancelados.'))return;
