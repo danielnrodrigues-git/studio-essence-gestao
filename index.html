@@ -1367,7 +1367,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
     act('receive',received?'Recebido':'Receber',()=>window.studioRefundReceiveHF19(r.id),!active||received||!['CREDITO_CARTAO','PIX_DINHEIRO'].includes(r.tipo));
     act('cancel','Cancelar',()=>window.studioRefundCancelHF19(r.id),!active||received);
     act('delete','Excluir',()=>window.studioRefundDeleteHF19(r.id),!active||received);
-    if(active&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id){
+    if(active&&received&&r.tipo==='CREDITO_CARTAO'&&!r.parcela_cartao_id){
      var sel=document.createElement('select');sel.style.maxWidth='195px';sel.style.marginLeft='5px';
      option(sel,'','Aplicar em fatura...');
      state.data.obligations.forEach(o=>{if(o.valor>=Number(r.valor))option(sel,o.parcela_id,o.descricao+' · '+moneyHF19(o.valor));});
