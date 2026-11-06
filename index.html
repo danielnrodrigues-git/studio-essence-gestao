@@ -831,6 +831,13 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
 </div>
 </section>
 <section class="section" id="section-expenses">
+<div class="card admin-only" id="refundSectionHF19" style="margin-bottom:14px">
+ <div class="toolbar" style="justify-content:space-between;align-items:center;gap:12px">
+  <div><h3 style="margin:0">Reembolsos de compras</h3><div class="tiny muted">Devoluções e estornos vinculados à despesa original, sem aumentar o faturamento de serviços.</div></div>
+  <button type="button" class="btn primary" onclick="studioRefundOpenHF19()">+ Registrar reembolso</button>
+ </div>
+ <div id="refundHistoryHF19" class="tiny muted">Carregando lançamentos...</div>
+</div>
 <div class="card form-card admin-only"><h3>Nova despesa</h3><div class="form-grid">
 <div class="field span2"><label>Descrição</label><input id="expDesc"/></div><div class="field"><label>Competência</label><input id="expBuy" type="date"/></div><div class="field"><label>Vencimento / 1ª fatura</label><input id="expDue" type="date"/></div>
 <div class="field"><label>Categoria</label><select id="expCat" onchange="updateExpenseSubcategories('new')"><option value="">Selecione...</option></select></div><div class="field hidden" id="expSubField"><label>Subcategoria</label><select id="expSub"><option value="">Selecione...</option></select></div><div class="field"><label>Valor total</label><input class="currency" id="expValue" inputmode="decimal" type="text" value="R$ 0,00"/></div><div class="field"><label>Forma de pagamento</label><select id="expPay"></select></div>
@@ -1233,6 +1240,186 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
  // Both admin and standard user birthday flows use the same safe link builder.
  window.sendBirthdayWhatsapp=launchBirthdayWhatsApp;
  window.sendBirthdayWhatsApp=launchBirthdayWhatsApp;
+})();
+</script>
+
+<style id="studio-refunds-hf19-style">
+#refundOverlayHF19{position:fixed;inset:0;background:rgba(18,34,26,.53);display:flex;align-items:center;justify-content:center;z-index:15000;padding:16px;overflow-y:auto}
+#refundOverlayHF19[hidden],#refundSuggestionsHF19[hidden]{display:none!important}
+#refundOverlayHF19 .refund-modal{width:min(740px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;background:#fffdf8;border-radius:19px;padding:25px;box-shadow:0 23px 65px rgba(0,0,0,.22)}
+#refundOverlayHF19 .refund-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:19px;gap:10px}
+#refundOverlayHF19 h3{margin:0;color:#173629;font-size:21px}
+#refundOverlayHF19 .refund-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#refundOverlayHF19 .refund-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+#refundOverlayHF19 .refund-field label{font-size:12px;font-weight:650;color:#285139}
+#refundOverlayHF19 .refund-field input,#refundOverlayHF19 .refund-field select,#refundOverlayHF19 .refund-field textarea{width:100%;min-height:42px;border:1px solid #dfd8ca;border-radius:10px;padding:9px 11px;background:white;color:#202c24;font:inherit}
+#refundOverlayHF19 .refund-field input:focus,#refundOverlayHF19 .refund-field select:focus{outline:2px solid #c6ae78;outline-offset:1px}
+#refundOverlayHF19 .refund-full{grid-column:1/-1}
+#refundOverlayHF19 .refund-picker{position:relative}
+#refundOverlayHF19 #refundSuggestionsHF19{position:absolute;left:0;right:0;top:calc(100% + 3px);max-height:214px;overflow:auto;background:white;border:1px solid #e0d7c5;border-radius:11px;padding:5px;box-shadow:0 9px 24px #223c3029;z-index:4}
+#refundOverlayHF19 .refund-option{padding:10px;border-radius:7px;cursor:pointer;border:0;background:white;display:block;width:100%;text-align:left;color:#173629;font-size:13px}
+#refundOverlayHF19 .refund-option:hover,#refundOverlayHF19 .refund-option:focus{background:#f1ecde}
+#refundOverlayHF19 .refund-option small{display:block;color:#617064;font-size:11px;margin-top:3px}
+#refundOverlayHF19 .refund-summary{font-size:12px;background:#f3f0e7;border-radius:10px;padding:11px;color:#31453a}
+#refundOverlayHF19 .refund-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px;flex-wrap:wrap}
+#refundHistoryHF19 table{width:100%;border-collapse:collapse;font-size:12px}
+#refundHistoryHF19 td,#refundHistoryHF19 th{padding:9px 8px;border-bottom:1px solid #e9e5dc;text-align:left}
+#refundHistoryHF19 th{color:#58675b;font-size:11px}
+#refundHistoryHF19 .refund-table-wrap{overflow-x:auto}
+@media(max-width:650px){#refundOverlayHF19 .refund-modal{padding:17px}#refundOverlayHF19 .refund-form{grid-template-columns:1fr}#refundOverlayHF19 .refund-full{grid-column:auto}}
+</style>
+<div id="refundOverlayHF19" hidden aria-hidden="true">
+ <div class="refund-modal" role="dialog" aria-modal="true" aria-labelledby="refundTitleHF19">
+  <div class="refund-head"><h3 id="refundTitleHF19">Registrar reembolso de compra</h3><button type="button" class="btn soft" onclick="studioRefundCloseHF19()">Fechar</button></div>
+  <form id="refundFormHF19" onsubmit="event.preventDefault();studioRefundSaveHF19()">
+   <div class="refund-form">
+    <div class="refund-field refund-full"><label for="refundOriginalHF19">Compra original *</label>
+     <div class="refund-picker"><input id="refundOriginalHF19" type="text" autocomplete="off" placeholder="Digite o nome da despesa..." aria-autocomplete="list" role="combobox" aria-controls="refundSuggestionsHF19" aria-expanded="false"/><div id="refundSuggestionsHF19" role="listbox" hidden></div></div>
+     <div class="refund-summary" id="refundExpenseSummaryHF19">Selecione a compra original.</div>
+    </div>
+    <div class="refund-field"><label for="refundTypeHF19">Tipo de reembolso *</label><select id="refundTypeHF19" onchange="studioRefundTypeHF19()"><option value="PIX_DINHEIRO">Pix / Dinheiro (conta financeira)</option><option value="CREDITO_CARTAO">Crédito na fatura do cartão</option><option value="CREDITO_FORNECEDOR">Crédito com fornecedor (sem entrada no caixa)</option></select></div>
+    <div class="refund-field"><label for="refundDateHF19">Data efetiva do reembolso *</label><input type="date" id="refundDateHF19" required/></div>
+    <div class="refund-field"><label for="refundValueHF19">Valor reembolsado (R$) *</label><input type="number" id="refundValueHF19" min="0.01" step="0.01" placeholder="0,00" required/></div>
+    <div class="refund-field" id="refundAccountWrapHF19"><label for="refundAccountHF19">Conta que recebeu o valor *</label><select id="refundAccountHF19"><option value="">Selecione a conta...</option></select></div>
+    <div class="refund-field" id="refundFormWrapHF19"><label for="refundFormHF19">Forma de recebimento</label><select id="refundFormHF19"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Transferência">Transferência</option></select></div>
+    <div class="refund-field refund-full" id="refundCardWrapHF19" hidden><label for="refundCardHF19">Obrigação de cartão a abater *</label><select id="refundCardHF19"><option value="">Selecione a parcela pendente...</option></select><small>É possível vincular o crédito a outra compra no cartão, desde que a obrigação ainda esteja pendente.</small></div>
+    <div class="refund-field refund-full"><label for="refundReasonHF19">Motivo / fornecedor</label><input id="refundReasonHF19" maxlength="500" placeholder="Produto com defeito, devolvido ao fornecedor..."/></div>
+    <div class="refund-field refund-full"><label for="refundNotesHF19">Observações (opcional)</label><textarea id="refundNotesHF19" rows="2" placeholder="Referência do estorno e eventual nova compra..."></textarea></div>
+   </div>
+   <p id="refundNoticeHF19" class="tiny muted" style="margin:12px 0 0">O reembolso ficará vinculado à despesa e registrado na data efetiva.</p>
+   <div class="refund-actions"><button class="btn soft" type="button" onclick="studioRefundCloseHF19()">Cancelar</button><button class="btn primary" type="submit" id="refundSubmitHF19">Confirmar reembolso</button></div>
+  </form>
+ </div>
+</div>
+<script id="studio-refunds-hf19">
+(function(){
+ 'use strict';
+ var state={data:null,selected:null,lock:false,key:null};
+ function dom(id){return document.getElementById(id);}
+ function value(id){return dom(id)?.value||'';}
+ function cents(n){return Math.round((Number(n)||0)*100)/100;}
+ function moneyHF19(v){return cents(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+ function clear(e){e.replaceChildren();}
+ function msg(t){if(typeof uiAlertV153HF1==='function')uiAlertV153HF1(t);else alert(t);}
+ function option(select,value,label){
+  var o=document.createElement('option');o.value=value;o.textContent=label;select.appendChild(o);
+ }
+ function labelType(t){return ({PIX_DINHEIRO:'Pix / dinheiro',CREDITO_CARTAO:'Crédito na fatura',CREDITO_FORNECEDOR:'Crédito fornecedor'})[t]||t;}
+ function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+ function closeSuggestions(){dom('refundSuggestionsHF19').hidden=true;dom('refundOriginalHF19').setAttribute('aria-expanded','false');}
+ function pickExpense(exp){
+  state.selected=exp;dom('refundOriginalHF19').value=exp.descricao+' · '+exp.data_compra;
+  dom('refundExpenseSummaryHF19').textContent='Compra '+exp.data_compra.split('-').reverse().join('/')+' · '+exp.forma+' · Original: '+moneyHF19(exp.valor_total)+' · Já reembolsado: '+moneyHF19(exp.reembolsado)+' · Disponível: '+moneyHF19(exp.disponivel);
+  dom('refundValueHF19').max=exp.disponivel;
+  closeSuggestions();
+ }
+ function suggestions(){
+  var m=dom('refundSuggestionsHF19'),q=norm(value('refundOriginalHF19').trim());
+  clear(m);if(!q||!state.data){closeSuggestions();return;}
+  var found=state.data.expenses.filter(x=>x.disponivel>0&&norm(x.descricao+' '+x.data_compra).includes(q)).slice(0,8);
+  found.forEach(function(x){
+   var b=document.createElement('button');b.type='button';b.className='refund-option';b.setAttribute('role','option');
+   b.textContent=x.descricao;var sub=document.createElement('small');sub.textContent=x.data_compra+' · '+moneyHF19(x.disponivel)+' disponível';b.appendChild(sub);
+   b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>pickExpense(x));m.appendChild(b);
+  });
+  if(!found.length){var n=document.createElement('div');n.className='refund-option';n.textContent='Nenhuma despesa encontrada';m.appendChild(n);}
+  m.hidden=false;dom('refundOriginalHF19').setAttribute('aria-expanded','true');
+ }
+ function displayHistory(){
+  var host=dom('refundHistoryHF19');if(!host||!state.data)return;
+  var rows=state.data.refunds||[];
+  clear(host);
+  if(!rows.length){host.textContent='Nenhum reembolso registrado. Use o botão para vincular uma devolução à compra original.';return;}
+  var wrap=document.createElement('div');wrap.className='refund-table-wrap';var table=document.createElement('table');
+  var head=document.createElement('thead'),tr=document.createElement('tr');
+  ['Data','Compra original','Tipo','Valor','Situação','Ações'].forEach(function(t){var th=document.createElement('th');th.textContent=t;tr.appendChild(th);});head.appendChild(tr);table.appendChild(head);
+  var body=document.createElement('tbody');
+  rows.slice(0,60).forEach(function(r){
+    var tr=document.createElement('tr');var fields=[r.data_reembolso.split('-').reverse().join('/'),r.descricao,labelType(r.tipo),moneyHF19(r.valor),r.status];
+    fields.forEach(function(f){var td=document.createElement('td');td.textContent=f;tr.appendChild(td);});
+    var td=document.createElement('td');if(r.status==='ATIVO'){
+      var button=document.createElement('button');button.className='btn soft small';button.type='button';button.textContent='Cancelar';
+      button.addEventListener('click',()=>window.studioRefundCancelHF19(r.id));td.appendChild(button);
+    }tr.appendChild(td);body.appendChild(tr);
+  });table.appendChild(body);wrap.appendChild(table);host.appendChild(wrap);
+ }
+ async function fetchData(){
+  state.data=await gs('apiExpenseRefundOptionsV181',STATE.token);displayHistory();return state.data;
+ }
+ window.studioRefundTypeHF19=function(){
+  var t=value('refundTypeHF19');
+  dom('refundAccountWrapHF19').hidden=t!=='PIX_DINHEIRO';
+  dom('refundFormWrapHF19').hidden=t!=='PIX_DINHEIRO';
+  dom('refundCardWrapHF19').hidden=t!=='CREDITO_CARTAO';
+  dom('refundNoticeHF19').textContent=t==='PIX_DINHEIRO'?'Entrada financeira somente na conta selecionada, sem aumentar o faturamento de serviços.':
+   t==='CREDITO_CARTAO'?'O crédito abate a obrigação de cartão selecionada, sem gerar entrada bancária.':
+   'Crédito reconhecido no histórico da compra, sem movimentar o caixa até sua utilização.';
+ };
+ window.studioRefundOpenHF19=async function(){
+  if(!STATE.token){msg('Faça login para continuar.');return;}
+  try{
+   await fetchData();state.selected=null;state.key=crypto.randomUUID();
+   dom('refundFormHF19').reset();dom('refundOriginalHF19').value='';
+   dom('refundExpenseSummaryHF19').textContent='Selecione a compra original.';
+   dom('refundValueHF19').removeAttribute('max');
+   dom('refundDateHF19').value=new Date().toLocaleDateString('en-CA');
+   var accounts=dom('refundAccountHF19');clear(accounts);option(accounts,'','Selecione a conta...');
+   state.data.accounts.forEach(x=>option(accounts,x.id,x.nome));
+   var obligations=dom('refundCardHF19');clear(obligations);option(obligations,'','Selecione uma parcela pendente...');
+   state.data.obligations.forEach(x=>option(obligations,x.parcela_id,x.descricao+' · '+x.vencimento+' · saldo '+moneyHF19(x.valor)));
+   window.studioRefundTypeHF19();
+   dom('refundOverlayHF19').hidden=false;dom('refundOverlayHF19').setAttribute('aria-hidden','false');
+   dom('refundOriginalHF19').focus();
+  }catch(e){msg('Não foi possível carregar os reembolsos: '+e.message);}
+ };
+ window.studioRefundCloseHF19=function(){
+  dom('refundOverlayHF19').hidden=true;dom('refundOverlayHF19').setAttribute('aria-hidden','true');closeSuggestions();
+ };
+ window.studioRefundSaveHF19=async function(){
+  if(state.lock)return;
+  var exp=state.selected,amount=cents(value('refundValueHF19')),kind=value('refundTypeHF19');
+  if(!exp){msg('Selecione a compra original na lista abaixo do campo.');return;}
+  if(!Number.isFinite(amount)||amount<=0||amount>cents(exp.disponivel)){msg('Valor inválido ou superior ao saldo da compra.');return;}
+  var target=state.data.obligations.find(x=>x.parcela_id===value('refundCardHF19'));
+  if(kind==='CREDITO_CARTAO'&&(!target||amount>target.valor)){msg('Selecione uma obrigação de cartão com saldo suficiente.');return;}
+  if(kind==='PIX_DINHEIRO'&&!value('refundAccountHF19')){msg('Selecione a conta que recebeu o reembolso.');return;}
+  var payload={chave_operacao:state.key,despesa_id:exp.id,tipo:kind,data_reembolso:value('refundDateHF19'),valor:amount,
+   conta_financeira_id:kind==='PIX_DINHEIRO'?value('refundAccountHF19'):null,
+   forma_recebimento:kind==='PIX_DINHEIRO'?value('refundFormHF19'):'',
+   parcela_cartao_id:kind==='CREDITO_CARTAO'?value('refundCardHF19'):null,
+   motivo:value('refundReasonHF19'),observacoes:value('refundNotesHF19')};
+  state.lock=true;dom('refundSubmitHF19').disabled=true;
+  try{
+   await gs('apiSaveExpenseRefundV181',STATE.token,payload);
+   window.studioRefundCloseHF19();await fetchData();
+   if(typeof loadExpenses==='function')await loadExpenses();
+   if(typeof refreshData==='function')await refreshData();
+   if(typeof toast==='function')toast('Reembolso registrado e conciliável pelo movimento correspondente.');
+  }catch(e){msg('Falha ao registrar reembolso: '+e.message);}
+  finally{state.lock=false;dom('refundSubmitHF19').disabled=false;}
+ };
+ window.studioRefundCancelHF19=async function(id){
+  if(!confirm('Cancelar este reembolso? Somente movimentos não conciliados podem ser cancelados.'))return;
+  try{await gs('apiCancelExpenseRefundV181',STATE.token,id);await fetchData();
+    if(typeof loadExpenses==='function')await loadExpenses();if(typeof refreshData==='function')await refreshData();
+    if(typeof toast==='function')toast('Reembolso cancelado e movimentos revertidos.');
+  }catch(e){msg(e.message);}
+ };
+ function ready(){
+  dom('refundOriginalHF19').addEventListener('input',function(){state.selected=null;dom('refundExpenseSummaryHF19').textContent='Selecione uma opção abaixo do campo.';suggestions();});
+  dom('refundOriginalHF19').addEventListener('keydown',function(e){if(e.key==='Escape')closeSuggestions();if(e.key==='Enter'){
+    var first=dom('refundSuggestionsHF19').querySelector('button');if(first&&!dom('refundSuggestionsHF19').hidden){e.preventDefault();first.click();}
+  }});
+  document.addEventListener('pointerdown',function(e){if(!e.target.closest('#refundOriginalHF19')&&!e.target.closest('#refundSuggestionsHF19'))closeSuggestions();});
+  dom('refundOverlayHF19').addEventListener('pointerdown',function(e){if(e.target===this)window.studioRefundCloseHF19();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!dom('refundOverlayHF19').hidden)window.studioRefundCloseHF19();});
+  var current=new MutationObserver(function(){
+   if(dom('refundSectionHF19')&&dom('section-expenses').classList.contains('active')&&STATE.token){
+    if(!state.data)fetchData().catch(()=>{});
+   }
+  });current.observe(dom('section-expenses'),{attributes:true,attributeFilter:['class']});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);else ready();
 })();
 </script>
 </body>
