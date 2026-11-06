@@ -1520,11 +1520,12 @@ tr.appendChild(td);body.appendChild(tr);
   // Keep a single visible expense action while retaining its original click handler, if supplied elsewhere.
   document.querySelectorAll('button').forEach(function(b){
    if(b===primary||b===dom('refundRegisterButtonHF20'))return;
-   if(/^\\+?\\s*(?:cadastrar nova despesa|cadastro de despesa)$/i.test((b.textContent||'').trim())){
+   if(/^\+?\s*(?:cadastrar nova despesa|cadastro de despesa)$/i.test((b.textContent||'').trim())){
     if(!b.dataset.refundUnifiedHF20){
       b.dataset.refundUnifiedHF20='1';
-      b.textContent='+ Cadastro de Despesa';
       b.hidden=true;
+      b.setAttribute('aria-hidden','true');
+      b.style.setProperty('display','none','important');
       primary.onclick=function(){b.click();};
     }
    }
