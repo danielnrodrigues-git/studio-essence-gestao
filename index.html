@@ -1245,7 +1245,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
 
 <style id="studio-refunds-hf19-style">
 #refundOverlayHF19{position:fixed;inset:0;background:rgba(18,34,26,.53);display:flex;align-items:center;justify-content:center;z-index:15000;padding:16px;overflow-y:auto}
-#refundOverlayHF19[hidden],#refundSuggestionsHF19[hidden]{display:none!important}
+#refundOverlayHF19[hidden],#refundSuggestionsHF19[hidden],#refundOverlayHF19 [hidden]{display:none!important}
 #refundOverlayHF19 .refund-modal{width:min(740px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;background:#fffdf8;border-radius:19px;padding:25px;box-shadow:0 23px 65px rgba(0,0,0,.22)}
 #refundOverlayHF19 .refund-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:19px;gap:10px}
 #refundOverlayHF19 h3{margin:0;color:#173629;font-size:21px}
@@ -1362,7 +1362,7 @@ body.studio-processing-v152{overflow:hidden!important}.package-protected-v152{bo
    dom('refundFormHF19').reset();dom('refundOriginalHF19').value='';
    dom('refundExpenseSummaryHF19').textContent='Selecione a compra original.';
    dom('refundValueHF19').removeAttribute('max');
-   dom('refundDateHF19').value=new Date().toLocaleDateString('en-CA');
+   dom('refundDateHF19').value=typeof isoToday==='function'?isoToday():new Date().toISOString().slice(0,10);
    var accounts=dom('refundAccountHF19');clear(accounts);option(accounts,'','Selecione a conta...');
    state.data.accounts.forEach(x=>option(accounts,x.id,x.nome));
    var obligations=dom('refundCardHF19');clear(obligations);option(obligations,'','Selecione uma parcela pendente...');
