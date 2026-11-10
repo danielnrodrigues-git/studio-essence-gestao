@@ -312,7 +312,7 @@ async function expenseQuery(){
   $('expenseSearch').value=lastSearch;
  }
  try{
-  const params={start:$('start').value,end:$('end').value,status:''};
+  const params={status:''};if($('start').value)params.start=$('start').value;if($('end').value)params.end=$('end').value;
   const records=await rpc('apiListExpenses',token,params);
   if(!Array.isArray(records))throw Error('A consulta de despesas retornou um formato inesperado.');
   expenseRows=records;
@@ -725,7 +725,7 @@ $('results').addEventListener('input',e=>{
  if(commissionDraft&&e.target.closest('#closePreview')&&e.target.matches('input'))calcCommissionDraft();
 });
 
-function openPage(p){page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
+function openPage(p){if(p==='expenses'&&page!=='expenses'){$('start').value='';$('end').value='';}else if(p==='cash'&&page!=='cash'){const d=dates();$('start').value=d.start;$('end').value=d.end;}page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
 $('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=()=>page==='expenses'?expenseQuery():loadPage();document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
 
 const PASSKEY_URL='https://mvtwejkxjrxbsuteemxj.supabase.co/functions/v1/studio-passkey';
