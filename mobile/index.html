@@ -464,7 +464,7 @@ async function renderCommissionTab(tab){
 function renderCommissionDraft(){
  const box=$('closePreview');if(!box||!commissionDraft)return;
  const items=commissionDraft.items||[],adv=commissionDraft.advances||[];
- let html=panel('Itens para fechamento',items.map((x,i)=>'<div class="mobile-entry" data-citem="'+i+'"><label class="inline-check"><input type="checkbox" class="c-on" checked> <strong>'+escapeText(x.descricao||'Item')+'</strong></label><small>'+escapeText(x.cliente||'')+' · '+escapeText(x.data||'')+' · '+escapeText(x.source_type||'')+'</small><div class="mobile-grid">'+fld('cbase-'+i,'Base (R$)','number',euro(x.base),'step="0.01" inputmode="decimal" class="c-base"')+fld('cpct-'+i,'Comissão (%)','number',(euro(x.percentual)*100).toFixed(2),'step="0.01" inputmode="decimal" class="c-pct"')+'</div>'+fld('cref-'+i,'Valor de referência (R$)','number',euro(x.valor_referencia),'step="0.01" inputmode="decimal" class="c-ref"')+'</div>').join('')||'<p class="notice">Nenhum serviço ou venda pendente neste período.</p>');
+ let html=panel('Itens para fechamento',items.map((x,i)=>'<div class="mobile-entry" data-citem="'+i+'"><label class="inline-check"><input type="checkbox" class="c-on" checked> <strong>'+escapeText(x.descricao||'Item')+'</strong></label><small>'+escapeText(x.cliente||'')+' · '+escapeText(x.data||'')+' · '+escapeText(x.source_type||'')+'</small><div class="mobile-grid">'+fld('cbase-'+i,'Base (R$)','number',euro(x.base),'step="0.01" inputmode="decimal" class="c-base"')+fld('cpct-'+i,'Comissão (%)','number',(euro(x.percentual)*100).toFixed(2),'step="0.01" inputmode="decimal" class="c-pct"')+'</div><div class="mobile-grid">'+fld('cref-'+i,'Valor de referência (R$)','number',euro(x.valor_referencia),'step="0.01" inputmode="decimal" class="c-ref"')+fld('ccomm-'+i,'Valor da comissão (R$)','number',euro(Number(x.comissao??(Number(x.base||0)*Number(x.percentual||0)))),'step="0.01" inputmode="decimal" class="c-commission" readonly tabindex="-1"')+'</div></div>').join('')||'<p class="notice">Nenhum serviço ou venda pendente neste período.</p>');
  if(!items.length){box.innerHTML=html;return;}
  if(adv.length)html+=panel('Vales disponíveis para compensação',adv.map((x,i)=>'<div class="mobile-entry" data-cadv="'+i+'"><label class="inline-check"><input type="checkbox" class="a-on" checked> '+escapeText(x.observacoes||'Vale / adiantamento')+'</label><small>Saldo disponível: '+fmt(x.saldo)+'</small>'+fld('ause-'+i,'Abater (R$)','number',euro(x.saldo),'step="0.01" inputmode="decimal" class="a-use"')+'</div>').join(''));
  html+=panel('Resumo e confirmação',fld('closeAdjustment','Ajuste manual (R$), + bônus / − desconto','number','0','step="0.01" inputmode="decimal"')+fld('closeAdjustmentDesc','Descrição do ajuste')+'<div id="closeTotals" class="notice"></div>'+fld('closePayDate','Data de pagamento','date',dates().end)+choose('closePayMethod','Forma de pagamento',opt(['Pix','Dinheiro','Débito','Crédito']))+'<div class="actionline">'+act('saveClosing','Salvar fechamento','secondary')+act('payClosing','Fechar e pagar')+'</div><p class="mobile-form-note">Salvar não paga a comissão. Fechar e pagar registra a saída financeira.</p>');
@@ -494,8 +494,17 @@ function collectDraft(){
  return {items,advances,adjustment,gross,net:Math.max(0,remaining)};
 }
 function calcCommissionDraft(){
- try{if(!$('closeTotals'))return;const x=collectDraft();$('closeTotals').textContent='Bruto '+fmt(x.gross)+' · Vales '+fmt(x.advances.reduce((sum,a)=>sum+a.valor,0))+' · Líquido '+fmt(x.net)}
- catch(e){if($('closeTotals'))$('closeTotals').textContent=e.message}
+ try{
+  document.querySelectorAll('[data-citem]').forEach(row=>{
+   const i=Number(row.dataset.citem);
+   const base=moneyInput('cbase-'+i),pct=moneyInput('cpct-'+i)/100;
+   const out=$('ccomm-'+i);
+   if(out)out.value=(Number.isFinite(base)&&Number.isFinite(pct)?Number((base*pct).toFixed(2)):0).toFixed(2);
+  });
+  if(!$('closeTotals'))return;
+  const x=collectDraft();
+  $('closeTotals').textContent='Bruto '+fmt(x.gross)+' · Vales '+fmt(x.advances.reduce((sum,a)=>sum+a.valor,0))+' · Líquido '+fmt(x.net)
+ }catch(e){if($('closeTotals'))$('closeTotals').textContent=e.message}
 }
 
 
