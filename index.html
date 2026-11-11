@@ -1992,6 +1992,31 @@ tr.appendChild(td);body.appendChild(tr);
 #appView>aside{isolation:isolate}
 #appView>aside .se-xmas-lights{display:none;position:absolute;top:0;left:0;right:0;height:49px;z-index:6;pointer-events:none;overflow:hidden}
 #appView>aside .se-xmas-lights svg{display:block;width:100%;height:100%;filter:drop-shadow(0 0 2px rgba(255,210,119,.5))}
+/* Natal 2026: brilho alternado, lento e discreto; sem layout shift. */
+@keyframes seChristmasGlowA{
+  0%,100%{opacity:1}
+  45%,55%{opacity:.34}
+}
+@keyframes seChristmasGlowB{
+  0%,100%{opacity:.34}
+  45%,55%{opacity:1}
+}
+#appView.se-xmas-season>aside .se-xmas-lights svg g:nth-of-type(1) ellipse:nth-child(odd){
+  animation:seChristmasGlowA 3.6s ease-in-out infinite
+}
+#appView.se-xmas-season>aside .se-xmas-lights svg g:nth-of-type(1) ellipse:nth-child(even){
+  animation:seChristmasGlowB 3.6s ease-in-out infinite
+}
+#appView.se-xmas-season>aside .se-xmas-lights svg g:nth-of-type(2) circle:nth-child(odd){
+  animation:seChristmasGlowA 3.6s ease-in-out infinite
+}
+#appView.se-xmas-season>aside .se-xmas-lights svg g:nth-of-type(2) circle:nth-child(even){
+  animation:seChristmasGlowB 3.6s ease-in-out infinite
+}
+@media(prefers-reduced-motion:reduce){
+ #appView.se-xmas-season>aside .se-xmas-lights svg g ellipse,
+ #appView.se-xmas-season>aside .se-xmas-lights svg g circle{animation:none!important}
+}
 #appView .se-xmas-hat{display:none;position:absolute;top:29px;left:8px;width:61px;height:54px;z-index:7;pointer-events:none;transform:rotate(-12deg)}
 #appView .se-xmas-hat svg{width:100%;height:100%;display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.23))}
 @media(min-width:1121px){
@@ -2003,7 +2028,7 @@ tr.appendChild(td);body.appendChild(tr);
 </style>
 <script id="studio-essence-christmas-season-2026">(function(){
  var today=new Date(),month=today.getMonth()+1,day=today.getDate();
- var active=(month===11||month===12||(month===1&&day<=6));
+ var year=today.getFullYear(); var active=(year===2026&&(month===11||month===12))||(year===2027&&month===1&&day<=6);
  var app=document.getElementById('appView');
  if(app)app.classList.toggle('se-xmas-season',active);
 })();</script>
