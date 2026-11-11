@@ -2119,5 +2119,59 @@ tr.appendChild(td);body.appendChild(tr);
 }
 </style>
 
+<style id="studio-essence-brand-text-proportion">
+/* Enlarge the typography while keeping the profile illustration at its approved size. */
+@media(min-width:901px){
+ #appView>aside .side-brand.official-brand > img.se-brand-type-enhanced{
+  width:min(100%,235px)!important;max-height:240px!important;
+ }
+}
+@media(min-width:901px) and (max-width:1500px){
+ #appView>aside .side-brand.official-brand > img.se-brand-type-enhanced{
+  width:min(100%,233px)!important;max-height:235px!important;
+ }
+}
+@media(min-width:901px) and (max-width:1180px){
+ #appView>aside .side-brand.official-brand > img.se-brand-type-enhanced{
+  width:min(100%,210px)!important;max-height:212px!important;
+ }
+}
+@media(min-width:901px) and (max-height:760px){
+ #appView>aside .side-brand.official-brand > img.se-brand-type-enhanced{
+  width:min(100%,170px)!important;max-height:175px!important;
+ }
+}
+</style>
+<script id="studio-essence-brand-text-proportion-js">
+(function(){
+ function enhanceBrand(){
+  var img=document.querySelector('#appView>aside .side-brand.official-brand > img');
+  if(!img||img.dataset.typeEnhanceApplied)return;
+  function apply(){
+   if(img.dataset.typeEnhanceApplied||!img.naturalWidth||!img.naturalHeight)return;
+   try{
+    var w=img.naturalWidth,h=img.naturalHeight,scale=1.13;
+    var split=Math.round(h*.54);
+    var cw=Math.round(w*scale),ch=Math.round(h+(h-split)*(scale-1)+4);
+    var canvas=document.createElement('canvas');canvas.width=cw;canvas.height=ch;
+    var ctx=canvas.getContext('2d');if(!ctx)return;
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    // Upper profile remains the same number of source pixels and is centered.
+    ctx.drawImage(img,0,0,w,split,(cw-w)/2,0,w,split);
+    // Entire brand signature grows 13%, preserving its original proportions.
+    ctx.drawImage(img,0,split,w,h-split,0,split+2,cw,(h-split)*scale);
+    var generated=canvas.toDataURL('image/png');
+    img.dataset.typeEnhanceApplied='true';
+    img.classList.add('se-brand-type-enhanced');
+    img.src=generated;
+   }catch(err){/* Retain the original branding on unsupported browsers. */}
+  }
+  if(img.complete&&img.naturalWidth)apply();
+  else img.addEventListener('load',apply,{once:true});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhanceBrand);
+ else enhanceBrand();
+})();
+</script>
 </body>
 </html>
