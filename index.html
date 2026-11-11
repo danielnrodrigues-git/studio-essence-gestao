@@ -2100,5 +2100,120 @@ tr.appendChild(td);body.appendChild(tr);
  }
 }
 </style>
+
+<style id="studio-xmas-hat-one-time-editor">
+@media(min-width:1121px){
+ #appView.se-xmas-season .se-xmas-edit-launch{display:flex!important}
+ #appView.se-xmas-season .se-xmas-hat.se-xmas-drag-active{outline:1px dashed #f0d19b;outline-offset:2px}
+}
+#appView .se-xmas-edit-launch{display:none;position:absolute;right:6px;bottom:8px;z-index:12;padding:4px 7px;border:1px solid #d9b977;border-radius:8px;color:#fff5d9;background:#08452f;font-size:11px;cursor:pointer}
+#appView .se-xmas-edit-launch:focus-visible{outline:2px solid #fff}
+#appView .se-xmas-hat.se-xmas-editable{pointer-events:auto!important;cursor:grab;touch-action:none}
+#appView .se-xmas-hat.se-xmas-editable:active{cursor:grabbing}
+#se-xmas-edit-panel{position:fixed;z-index:999999;right:20px;top:90px;width:278px;max-width:calc(100vw - 40px);max-height:calc(100vh - 110px);overflow:auto;background:#fffaf0;color:#123c2c;border:1px solid #d2b476;box-shadow:0 12px 35px #001a1290;border-radius:14px;padding:14px;font:13px system-ui, sans-serif;display:none}
+#se-xmas-edit-panel.se-open{display:block}
+#se-xmas-edit-panel .se-head{display:flex;justify-content:space-between;align-items:center;font-weight:750;font-size:15px;margin-bottom:5px}
+#se-xmas-edit-panel .se-desc{color:#52685d;font-size:12px;line-height:1.35;margin-bottom:12px}
+#se-xmas-edit-panel .se-line{display:grid;grid-template-columns:80px 1fr 44px;gap:6px;align-items:center;margin:9px 0}
+#se-xmas-edit-panel input[type=range]{width:100%;accent-color:#085236}
+#se-xmas-edit-panel output{font-variant-numeric:tabular-nums;text-align:right;font-size:12px}
+#se-xmas-edit-panel button{font:inherit;border:1px solid #cdb782;background:#fff;color:#123c2c;padding:8px;border-radius:8px;cursor:pointer}
+#se-xmas-edit-panel .se-btnrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+#se-xmas-edit-panel .se-primary{background:#075038;color:#fff;border-color:#075038}
+#se-xmas-edit-panel .se-status{min-height:17px;font-size:11px;margin-top:8px;color:#176548}
+@media(max-width:1120px){#appView .se-xmas-edit-launch,#se-xmas-edit-panel{display:none!important}}
+</style>
+<script id="studio-xmas-hat-one-time-editor-js">
+(function(){
+  var key='studioEssenceXmasHatEditor2026';
+  function init(){
+    var app=document.getElementById('appView');
+    if(!app||!app.classList.contains('se-xmas-season'))return;
+    var brand=app.querySelector('aside .side-brand.official-brand');
+    var hat=brand&&brand.querySelector('.se-xmas-hat');
+    if(!brand||!hat)return;
+    var launch=document.createElement('button');
+    launch.type='button';launch.className='se-xmas-edit-launch';
+    launch.textContent='Ajustar gorro';
+    launch.setAttribute('aria-label','Ajustar posição do gorro natalino');
+    brand.appendChild(launch);
+    var panel=document.createElement('section');
+    panel.id='se-xmas-edit-panel';
+    panel.setAttribute('role','dialog');
+    panel.setAttribute('aria-label','Posicionar gorro natalino');
+    panel.innerHTML='<div class="se-head"><span>Ajuste do gorro</span><button type="button" data-action="close" aria-label="Fechar">×</button></div>'
+      +'<div class="se-desc">Arraste o gorro sobre o logo ou use os controles. Salve e copie os valores para me enviar e finalizarmos o ajuste.</div>'
+      +'<div class="se-line"><label for="seh-x">Horizontal</label><input id="seh-x" type="range" min="0" max="190" step="1"><output data-show="x"></output></div>'
+      +'<div class="se-line"><label for="seh-y">Vertical</label><input id="seh-y" type="range" min="-30" max="140" step="1"><output data-show="y"></output></div>'
+      +'<div class="se-line"><label for="seh-size">Tamanho</label><input id="seh-size" type="range" min="35" max="115" step="1"><output data-show="size"></output></div>'
+      +'<div class="se-line"><label for="seh-deg">Rotação</label><input id="seh-deg" type="range" min="-40" max="40" step="1"><output data-show="deg"></output></div>'
+      +'<div class="se-btnrow"><button type="button" class="se-primary" data-action="save">Salvar posição</button><button type="button" data-action="copy">Copiar ajuste</button><button type="button" data-action="reset">Restaurar</button></div>'
+      +'<div class="se-status" aria-live="polite"></div>';
+    document.body.appendChild(panel);
+    var ids={x:'seh-x',y:'seh-y',size:'seh-size',deg:'seh-deg'};
+    var inputs={};Object.keys(ids).forEach(function(k){inputs[k]=panel.querySelector('#'+ids[k])});
+    var status=panel.querySelector('.se-status');
+    var initial={
+      x:Math.round(parseFloat(getComputedStyle(hat).left)||0),
+      y:Math.round(parseFloat(getComputedStyle(hat).top)||0),
+      size:Math.round(hat.getBoundingClientRect().width||73),
+      deg:5
+    };
+    var v=Object.assign({},initial);
+    function bound(k,num){
+      var i=inputs[k];return Math.max(Number(i.min),Math.min(Number(i.max),Math.round(Number(num)||0)));
+    }
+    function render(){
+      v.x=bound('x',v.x);v.y=bound('y',v.y);v.size=bound('size',v.size);v.deg=bound('deg',v.deg);
+      hat.style.left=v.x+'px';hat.style.top=v.y+'px';
+      hat.style.width=v.size+'px';hat.style.height=Math.round(v.size*59/73)+'px';
+      hat.style.transform='rotate('+v.deg+'deg)';
+      Object.keys(inputs).forEach(function(k){inputs[k].value=v[k];panel.querySelector('[data-show="'+k+'"]').textContent=v[k]+(k==='deg'?'°':'px')});
+    }
+    try{
+      var saved=JSON.parse(localStorage.getItem(key)||'null');
+      if(saved&&['x','y','size','deg'].every(function(k){return Number.isFinite(Number(saved[k]))}))
+        v={x:saved.x,y:saved.y,size:saved.size,deg:saved.deg};
+    }catch(e){}
+    render();
+    Object.keys(inputs).forEach(function(k){inputs[k].addEventListener('input',function(){v[k]=Number(this.value);render();status.textContent='Prévia atualizada. Salve quando estiver pronto.'})});
+    function close(){panel.classList.remove('se-open');hat.classList.remove('se-xmas-editable')}
+    launch.addEventListener('click',function(){
+      var open=!panel.classList.contains('se-open');
+      panel.classList.toggle('se-open',open);
+      hat.classList.toggle('se-xmas-editable',open);
+      if(open)status.textContent='Arraste o gorro ou use os controles.';
+    });
+    panel.addEventListener('click',function(ev){
+      var button=ev.target.closest('[data-action]');if(!button)return;
+      var action=button.getAttribute('data-action');
+      if(action==='close'){close();return}
+      if(action==='reset'){v=Object.assign({},initial);try{localStorage.removeItem(key)}catch(e){}render();status.textContent='Posição original restaurada.';return}
+      if(action==='save'){try{localStorage.setItem(key,JSON.stringify(v));status.textContent='Salvo neste navegador. Envie os valores para deixar definitivo.'}catch(e){status.textContent='Não foi possível salvar neste navegador.'}return}
+      if(action==='copy'){
+        var data='Ajuste final gorro Studio Essence: horizontal='+v.x+'px; vertical='+v.y+'px; tamanho='+v.size+'px; rotação='+v.deg+'°';
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(data).then(function(){status.textContent='Valores copiados! Cole na conversa.'},function(){status.textContent=data});
+        }else{status.textContent=data}
+      }
+    });
+    var drag=null;
+    hat.addEventListener('pointerdown',function(e){
+      if(!panel.classList.contains('se-open'))return;
+      e.preventDefault();drag={id:e.pointerId,px:e.clientX,py:e.clientY,x:v.x,y:v.y};
+      hat.setPointerCapture(e.pointerId);hat.classList.add('se-xmas-drag-active')
+    });
+    hat.addEventListener('pointermove',function(e){
+      if(!drag||drag.id!==e.pointerId)return;
+      v.x=drag.x+e.clientX-drag.px;v.y=drag.y+e.clientY-drag.py;
+      render();status.textContent='Prévia atualizada. Salve quando estiver pronto.'
+    });
+    function stop(e){if(drag&&e.pointerId===drag.id){drag=null;hat.classList.remove('se-xmas-drag-active')}}
+    hat.addEventListener('pointerup',stop);hat.addEventListener('pointercancel',stop);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+
 </body>
 </html>
