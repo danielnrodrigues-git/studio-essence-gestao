@@ -2051,12 +2051,21 @@ tr.appendChild(td);body.appendChild(tr);
 @media(max-height:760px){#appView.se-xmas-season .se-xmas-hat{top:9px;left:clamp(73px,36%,93px);width:54px;height:45px} #appView.se-xmas-season>aside .se-xmas-bottom{opacity:.85}}
 </style>
 <script id="studio-essence-christmas-season-2026">(function(){
- var today=new Date(),month=today.getMonth()+1,day=today.getDate();
- var year=today.getFullYear(); var active=(year===2026&&(month===11||month===12))||(year===2027&&month===1&&day<=6);
- var app=document.getElementById('appView');
- if(app)app.classList.toggle('se-xmas-season',active);
- var login=document.getElementById('loginView');
- if(login)login.classList.toggle('se-xmas-season',active);
+ // Christmas decorations remain active until 05/01/2027 (São Paulo time).
+ // From 00:00 on 06/01/2027, remove all seasonal ornaments and the Santa hat.
+ function syncChristmasSeason(){
+  var parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'numeric',day:'numeric'}).formatToParts(new Date());
+  var date={};parts.forEach(function(p){if(p.type==='year'||p.type==='month'||p.type==='day')date[p.type]=Number(p.value)});
+  var active=(date.year===2026&&(date.month===11||date.month===12))||
+   (date.year===2027&&date.month===1&&date.day<=5);
+  var app=document.getElementById('appView');
+  var login=document.getElementById('loginView');
+  if(app)app.classList.toggle('se-xmas-season',active);
+  if(login)login.classList.toggle('se-xmas-season',active);
+ }
+ syncChristmasSeason();
+ // Also handles open desktop or mobile/PWA sessions crossing midnight.
+ setInterval(syncChristmasSeason,60000);
 })();</script>
 <style id="studio-essence-desktop-sidebar-brand-balance-v2">
 /* Desktop sidebar: give the Studio Essence signature more visual presence,
