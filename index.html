@@ -2058,5 +2058,47 @@ tr.appendChild(td);body.appendChild(tr);
  var login=document.getElementById('loginView');
  if(login)login.classList.toggle('se-xmas-season',active);
 })();</script>
+<style id="studio-essence-desktop-sidebar-brand-balance-v2">
+/* Desktop sidebar: give the Studio Essence signature more visual presence,
+   move the navigation gently down, keep its independent scrolling intact. */
+@media (min-width:901px){
+ #appView>aside .side-brand.official-brand{
+   margin-bottom:12px!important;
+   padding-top:10px!important;
+ }
+ #appView>aside .side-brand.official-brand > img{
+   width:min(100%,220px)!important;
+   max-height:225px!important;
+ }
+ #appView>aside .side-nav-scroll{
+   padding-top:10px!important;
+ }
+}
+@media (min-width:901px) and (max-width:1500px){
+ #appView>aside .side-brand.official-brand > img{
+   width:min(100%,205px)!important;
+   max-height:205px!important;
+ }
+}
+@media (min-width:901px) and (max-width:1180px){
+ #appView>aside .side-brand.official-brand > img{
+   width:min(100%,185px)!important;
+   max-height:185px!important;
+ }
+}
+@media (min-width:901px) and (max-height:760px){
+ #appView>aside .side-brand.official-brand{
+   padding-top:8px!important;
+   margin-bottom:6px!important;
+ }
+ #appView>aside .side-brand.official-brand > img{
+   width:min(100%,150px)!important;
+   max-height:150px!important;
+ }
+ #appView>aside .side-nav-scroll{
+   padding-top:5px!important;
+ }
+}
+</style>
 </body>
 </html>
