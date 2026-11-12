@@ -100,6 +100,7 @@
 <button class="action" data-page="commissions"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 20c.5-4 2.5-6 5.5-6s5 2 5.5 6M10.5 20c.4-3.3 2.3-5 5.5-5s5.1 1.7 5.5 5"/></svg></span>Comissões</button>
 <button class="action" data-page="cash"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg></span>Fluxo de Caixa</button>
 <button class="action" data-page="expenses"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span>Despesas</button>
+<button class="action" data-page="revenues"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21V3M7 8l5-5 5 5M4 13h16M4 18h16"/></svg></span>Receitas</button>
 <button class="action" data-page="accounts"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4M16 15h2"/><path d="M7 3h10"/></svg></span>Contas financeiras</button></div>
 
 </div>
@@ -184,7 +185,7 @@ async function homeData(){
  }catch(e){$('gross').textContent='Indisponível';$('commission').textContent='—';$('available').textContent='—';$('revenueComparison').textContent='Comparativo indisponível';status('Erro ao consultar indicadores');}
  finally{status('')}
 }
-const sections={commissions:'Comissões',cash:'Fluxo de Caixa',expenses:'Despesas',accounts:'Contas financeiras'};
+const sections={commissions:'Comissões',cash:'Fluxo de Caixa',expenses:'Despesas',revenues:'Receitas',accounts:'Contas financeiras'};
 async function loadPage(){if(page==='home')return homeData();$('results').innerHTML='<p class="notice">Consultando dados…</p>';status('Consultando…');try{
 const params={start:$('start').value,end:$('end').value};let records=[];
 if(page==='commissions'){await loadMobileFinance('commissions');return;}
@@ -208,6 +209,7 @@ if(page==='cash'){
  )).join('')||'<p class="notice">Nenhuma movimentação no período.</p>');
 }
 if(page==='expenses'){await loadMobileExpenses();return;}
+if(page==='revenues'){await loadMobileRevenues();return;}
 if(page==='accounts'){await loadMobileFinance('accounts');return;}
 }catch(e){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(e.message)+'</p>'}finally{status('')}}
 
@@ -425,6 +427,148 @@ $('results').addEventListener('change',ev=>{
  if(page!=='expenses')return;
  if(ev.target.id==='exCat')expenseSelectCategory();
  if(['exStatus','exMethod','exRecurring'].includes(ev.target.id))expenseToggleFields();
+});
+
+
+/* Receitas mobile: usa os mesmos endpoints e regras financeiras do desktop.
+   Datas são strings ISO locais YYYY-MM-DD; nunca se referencia variável DATA global. */
+let revenueDomains=null,revenueReferences=null,revenueRows=[],revenueTab='list',revenueEditing=null,revenueBusy=false;
+const revenueGet=id=>String($(id)?.value??'').trim();
+const revenueValidDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))&&!Number.isNaN(new Date(String(value)+'T12:00:00').getTime());
+function revenueFeedback(message,error=false){
+ const target=$('revenueFeedback');if(!target)return;
+ target.className='expense-status '+(error?'error':'success');target.textContent=message;
+}
+function revenueOptions(items,selected='',blank='Selecione'){
+ const opts=[{id:'',nome:blank},...(items||[])];
+ return opts.map(x=>'<option value="'+escapeText(x.id)+'" '+(String(x.id)===String(selected)?'selected':'')+'>'+escapeText(x.nome)+'</option>').join('');
+}
+function revenueSubOptions(categoryId,selected=''){
+ return revenueOptions((revenueDomains?.subcategories||[]).filter(x=>String(x.categoria_id)===String(categoryId)),selected,'Sem subcategoria');
+}
+function revenueTabs(tab){
+ document.querySelectorAll('[data-rev-tab]').forEach(b=>b.classList.toggle('active',b.dataset.revTab===tab||(tab==='edit'&&b.dataset.revTab==='new')));
+}
+async function loadMobileRevenues(){
+ revenueTab='list';revenueEditing=null;
+ $('results').innerHTML='<p class="notice">Carregando receitas…</p>';
+ try{
+  const [domains,refs]=await Promise.all([rpc('apiRevenueDomainsV149',token),rpc('apiReferenceDataV154',token)]);
+  if(!Array.isArray(domains?.categories)||!Array.isArray(refs?.paymentMethods))throw Error('Referências de receitas indisponíveis.');
+  revenueDomains=domains;revenueReferences=refs;
+  $('results').innerHTML='<div class="expense-tabs"><button type="button" data-rev-tab="list" class="active">Consultar receitas</button><button type="button" data-rev-tab="new">Nova receita</button></div><div id="revenueFeedback" class="hidden"></div><div id="revenueContent"></div>';
+  await revenueShow('list');
+ }catch(e){$('results').innerHTML='<p class="notice" role="alert">'+escapeText(e.message||String(e))+'</p>';}
+}
+async function revenueShow(tab,record=null){
+ revenueTab=tab;revenueEditing=tab==='edit'?record:null;revenueTabs(tab);
+ const el=$('revenueContent');if(!el)return;
+ if(tab==='list'){el.innerHTML='<p class="notice">Consultando receitas…</p>';await revenueQuery();return;}
+ const r=record||{},today=dates().end,edit=tab==='edit',locked=!!r.has_received;
+ const methods=(revenueReferences?.paymentMethods||[]).filter(x=>x.ativo===undefined||String(x.ativo)!=='false');
+ const cat=r.categoria_id||'',sub=r.subcategoria_id||'';
+ el.innerHTML='<section class="mobile-panel"><h3>'+(edit?'Editar receita':'Cadastrar receita')+'</h3><div class="expense-fields">'+
+  '<div class="full-span">'+expenseField('revDesc','Descrição','text',r.descricao||'','maxlength="250" required')+'</div>'+
+  expenseField('revCompetence','Competência','date',r.data_competencia||today,'required')+
+  expenseField('revDue','1º recebimento previsto','date',r.vencimento||today,(locked?'disabled ':'')+'required')+
+  '<div class="field"><label for="revCategory">Categoria</label><select id="revCategory" required>'+revenueOptions(revenueDomains?.categories,cat)+'</select></div>'+
+  '<div class="field"><label for="revSub">Subcategoria</label><select id="revSub">'+revenueSubOptions(cat,sub)+'</select></div>'+
+  expenseField('revAmount','Valor total (R$)','number',edit?r.valor_total:'','min="0.01" step="0.01" inputmode="decimal" '+(locked?'disabled ':'')+'required')+
+  '<div class="field"><label for="revMethod">Forma de pagamento</label><select id="revMethod" '+(locked?'disabled':'')+'>'+revenueOptions(methods,r.forma_id,'Não informado')+'</select></div>'+
+  expenseField('revClient','Cliente / identificação','text',r.cliente||'','maxlength="150"')+
+  expenseField('revInstallments','Parcelas','number',r.qtd_parcelas||1,'min="1" max="120" step="1" '+(locked?'disabled ':''))+
+  (!edit?'<div class="field"><label for="revStatus">Status inicial</label><select id="revStatus"><option value="PREVISTA">Prevista</option><option value="RECEBIDA">Recebida</option></select></div>'+
+  '<div class="field"><label for="revRecurring">Recorrente?</label><select id="revRecurring"><option value="false">Não</option><option value="true">Sim</option></select></div>'+
+  '<div class="field hidden" id="revRecMonthsWrap">'+expenseField('revRecMonths','Meses de recorrência','number',12,'min="1" max="120"')+'</div>':'')+
+  '<div class="full-span">'+expenseField('revNotes','Observações','text',r.observacoes||'')+'</div>'+
+  '</div>'+(locked?'<p class="notice">Receita com recebimento: dados financeiros bloqueados para proteger o histórico.</p>':'')+
+  '<div class="expense-actions"><button type="button" class="primary" data-rev-action="save">'+(edit?'Salvar alterações':'Cadastrar receita')+'</button><button type="button" class="secondary" data-rev-action="list">Voltar</button></div></section>';
+}
+async function revenueQuery(){
+ const el=$('revenueContent');if(!el)return;
+ const previous=$('revSearch')?.value||'';
+ el.innerHTML='<div class="field expense-search-field"><label for="revSearch">Pesquisar receita</label><input id="revSearch" type="search" placeholder="Descrição ou cliente" value="'+escapeText(previous)+'"></div><div id="revList" aria-live="polite"><p class="notice">Consultando…</p></div>';
+ try{
+  const params={};if(revenueValidDate($('start').value))params.start=$('start').value;if(revenueValidDate($('end').value))params.end=$('end').value;
+  const response=await rpc('apiListRevenuesV149',token,params);
+  if(!Array.isArray(response?.rows))throw Error('Consulta de receitas retornou um formato inesperado.');
+  revenueRows=response.rows;revenueRender();
+ }catch(e){$('revList').innerHTML='<p class="notice" role="alert">'+escapeText(e.message||String(e))+'</p>';}
+}
+function revenueRender(){
+ const el=$('revList');if(!el)return;
+ const query=normalizeExpenseSearch(revenueGet('revSearch'));
+ const filtered=revenueRows.filter(r=>normalizeExpenseSearch([r.descricao,r.cliente,r.categoria].join(' ')).includes(query));
+ const total=filtered.reduce((sum,r)=>sum+Number(r.valor_bruto||0),0);
+ const rows=filtered.map(r=>{
+  const id=escapeText(r.record_id||''),parcel=escapeText(r.parcel_id||'');
+  const buttons=(r.can_edit?'<button class="secondary mini" data-rev-action="edit" data-id="'+id+'">Editar</button>':'')+
+   (r.can_receive?'<button class="secondary mini" data-rev-action="receive" data-parcel="'+parcel+'" data-id="'+id+'">Receber</button>':'')+
+   (r.can_cancel?'<button class="secondary mini" data-rev-action="cancel" data-id="'+id+'">Cancelar</button>':'')+
+   (r.can_delete?'<button class="secondary mini" data-rev-action="delete" data-id="'+id+'">Excluir</button>':'');
+  return '<div class="expense-row"><div class="expense-rowhead"><strong>'+escapeText(r.descricao||'Receita')+'</strong><span class="expense-chip '+(r.status==='RECEBIDA'?'paid':'')+'">'+escapeText(r.status||'')+'</span></div>'+
+   '<small>'+escapeText(r.data||'')+' · '+escapeText(r.categoria||'')+' · '+escapeText(r.origem||'')+'</small>'+
+   '<div class="expense-rowhead"><strong>'+fmt(r.valor_bruto)+'</strong><small>Parcela '+escapeText(r.parcela||'1/1')+' · '+escapeText(r.forma||'')+'</small></div>'+
+   (r.cliente?'<small>'+escapeText(r.cliente)+'</small>':'')+
+   (buttons?'<div class="expense-actions">'+buttons+'</div>':'')+'</div>';
+ }).join('');
+ el.innerHTML='<div class="cash-totals"><div><small>Total filtrado</small><strong>'+fmt(total)+'</strong></div><div><small>Registros</small><strong>'+filtered.length+'</strong></div></div>'+ (rows||'<p class="notice">Nenhuma receita encontrada.</p>');
+}
+async function revenueSave(){
+ const edit=revenueTab==='edit',r=revenueEditing||{},dateValue=revenueGet('revCompetence'),due=revenueGet('revDue');
+ const amount=Number(revenueGet('revAmount')),parts=Number(revenueGet('revInstallments'));
+ if(!revenueGet('revDesc')||!revenueGet('revCategory'))throw Error('Informe descrição e categoria.');
+ if(!revenueValidDate(dateValue)||(!r.has_received&&!revenueValidDate(due)))throw Error('Informe datas válidas para competência e recebimento.');
+ if(!r.has_received&&(!(amount>0)||!Number.isInteger(parts)||parts<1))throw Error('Informe valor e quantidade de parcelas válidos.');
+ const payload={descricao:revenueGet('revDesc'),data_competencia:dateValue,categoria_id:revenueGet('revCategory'),
+  subcategoria_id:revenueGet('revSub'),cliente:revenueGet('revClient'),observacoes:revenueGet('revNotes'),
+  forma_id:r.has_received?r.forma_id:revenueGet('revMethod'),
+  vencimento:r.has_received?r.vencimento:due};
+ if(edit){
+  Object.assign(payload,{id:r.id,valor_total:r.has_received?r.valor_total:amount,qtd_parcelas:r.has_received?r.qtd_parcelas:parts,natureza:r.natureza});
+ }else{
+  Object.assign(payload,{valor:amount,parcelas:parts,status:revenueGet('revStatus'),
+   recorrente:revenueGet('revRecurring')==='true',recorrencia_meses:Number(revenueGet('revRecMonths'))||12});
+ }
+ const action=edit?'atualizar':'cadastrar';
+ if(!window.confirm('Deseja '+action+' a receita de '+fmt(r.has_received?r.valor_total:amount)+'?'))return;
+ const result=await rpc(edit?'apiUpdateRevenueV149':'apiSaveRevenueV149',token,payload);
+ if(result?.ok===false)throw Error('Não foi possível gravar a receita.');
+ await revenueShow('list');revenueFeedback('Receita salva com sucesso.');
+}
+async function revenueAction(action,id,parcel){
+ if(action==='list')return revenueShow('list');
+ if(action==='save')return revenueSave();
+ if(action==='edit'){const r=await rpc('apiGetRevenueV149',token,id);if(!r?.id)throw Error('Receita não encontrada.');return revenueShow('edit',r);}
+ if(action==='receive'){
+  const dateValue=window.prompt('Data efetiva do recebimento (AAAA-MM-DD):',dates().end);
+  if(dateValue===null)return;
+  if(!revenueValidDate(dateValue))throw Error('Data de recebimento inválida.');
+  if(!window.confirm('Confirmar recebimento da parcela nesta data?'))return;
+  await rpc('apiReceiveRevenueParcelV149',token,parcel,dateValue);
+ }else if(action==='cancel'||action==='delete'){
+  if(!window.confirm(action==='cancel'?'Cancelar esta receita manual?':'Excluir esta receita manual? Esta ação não poderá ser desfeita.'))return;
+  await rpc(action==='cancel'?'apiCancelRevenueV149':'apiDeleteRevenueV149',token,id);
+ }else return;
+ await revenueShow('list');revenueFeedback('Operação realizada com sucesso.');
+}
+$('results').addEventListener('click',async ev=>{
+ if(page!=='revenues')return;
+ const tab=ev.target.closest('[data-rev-tab]');
+ if(tab){await revenueShow(tab.dataset.revTab);return;}
+ const button=ev.target.closest('[data-rev-action]');if(!button||button.disabled||revenueBusy)return;
+ revenueBusy=true;button.disabled=true;
+ try{await revenueAction(button.dataset.revAction,button.dataset.id,button.dataset.parcel);}
+ catch(e){revenueFeedback(e.message||String(e),true);}
+ finally{revenueBusy=false;if(button.isConnected)button.disabled=false;}
+});
+$('results').addEventListener('input',ev=>{
+ if(page==='revenues'&&ev.target.id==='revSearch')revenueRender();
+});
+$('results').addEventListener('change',ev=>{
+ if(page!=='revenues')return;
+ if(ev.target.id==='revCategory'&&$('revSub'))$('revSub').innerHTML=revenueSubOptions(revenueGet('revCategory'));
+ if(ev.target.id==='revRecurring')$('revRecMonthsWrap')?.classList.toggle('hidden',revenueGet('revRecurring')!=='true');
 });
 
 let financeMode='',financeTab='',financeBank=null,financeProfessionals=[],commissionDraft=null,financeBusy=false;
@@ -746,8 +890,8 @@ $('results').addEventListener('input',e=>{
  if(commissionDraft&&e.target.closest('#closePreview')&&e.target.matches('input'))calcCommissionDraft();
 });
 
-function openPage(p){if(p==='expenses'&&page!=='expenses'){$('start').value='';$('end').value='';}else if(p==='cash'&&page!=='cash'){const d=dates();$('start').value=d.start;$('end').value=d.end;}page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
-$('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=()=>page==='expenses'?expenseQuery():loadPage();document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
+function openPage(p){if((p==='expenses'||p==='revenues')&&page!==p){$('start').value='';$('end').value='';}else if(p==='cash'&&page!=='cash'){const d=dates();$('start').value=d.start;$('end').value=d.end;}page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses'||p==='revenues';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
+$('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=()=>page==='expenses'?expenseQuery():page==='revenues'?revenueQuery():loadPage();document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
 
 const PASSKEY_URL='https://mvtwejkxjrxbsuteemxj.supabase.co/functions/v1/studio-passkey';
 const passkeySupported=()=>window.isSecureContext&&typeof window.PublicKeyCredential!=='undefined'&&!!navigator.credentials;
