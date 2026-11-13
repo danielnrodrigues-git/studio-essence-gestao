@@ -607,9 +607,11 @@ async function loadMobileFinance(mode){
  $('results').innerHTML='<div class="notice">Carregando '+(mode==='commissions'?'comissões':'contas financeiras')+'…</div>';
  try{
   if(mode==='commissions'){
-   const p=await rpc('apiCommissionHistoryProfessionalsV160',token);
-   if(!Array.isArray(p))throw Error('Não foi possível carregar os profissionais.');
-   financeProfessionals=p;
+   const [p,refs]=await Promise.all([rpc('apiCommissionHistoryProfessionalsV160',token),rpc('apiReferenceDataV154',token)]);
+   if(!Array.isArray(p)||!Array.isArray(refs?.professionals))throw Error('Não foi possível carregar os profissionais.');
+   const byId=new Map();
+   [...p,...refs.professionals].forEach(x=>{if(x?.id)byId.set(String(x.id),{id:x.id,nome:x.nome||x.id})});
+   financeProfessionals=[...byId.values()].sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
   }else{
    financeBank=await rpc('apiFinancialBootstrapV172',token);
    if(!financeBank||!Array.isArray(financeBank.accounts))throw Error('Não foi possível carregar as contas financeiras.');
@@ -638,7 +640,7 @@ async function renderCommissionTab(tab){
     choose('historyProf','Profissional','<option value="">Todas as profissionais</option>'+profOptions(filters.profissional_id))+
     '<div class="mobile-grid">'+fld('historyStart','De','date',filters.start)+fld('historyEnd','Até','date',filters.end)+'</div>'+
     choose('historyStatus','Situação',opt(['','ABERTO','PAGO'],filters.status).replace('<option value="">','<option value="">Todos os status'))+
-    act('filterCommission','Aplicar filtros')+'<p class="mobile-form-note">O total considera apenas fechamentos que correspondem aos filtros selecionados.</p>'+
+    act('filterCommission','Aplicar filtros')+'<p class="mobile-form-note">Profissional e período determinam os totais. O filtro de situação restringe apenas a lista de fechamentos.</p>'+
     '<div id="historyCommissionResults"><p class="notice">Consultando fechamentos…</p></div>');
   await loadCommissionHistoryResults();
  }
@@ -660,21 +662,38 @@ async function renderCommissionTab(tab){
 async function loadCommissionHistoryResults(){
  const el=$('historyCommissionResults');if(!el)return;
  const filters=commissionHistoryFilters||{};
- const rows=await rpc('apiCommissionHistory',token,filters);
- if(!Array.isArray(rows))throw Error('Histórico de fechamentos em formato inesperado.');
- const filtered=filters.status?rows.filter(x=>String(x.status||'').toUpperCase()===filters.status):rows;
- const totalCommission=filtered.reduce((n,x)=>n+Number(x.bruto||0),0);
- const outstanding=filtered.filter(x=>String(x.status||'').toUpperCase()!=='PAGO');
- const balanceToPay=outstanding.reduce((n,x)=>n+Number(x.total||0),0);
- const stats='<div class="cash-totals"><div><small>Total de comissões</small><strong>'+fmt(totalCommission)+'</strong></div>'+
-  '<div><small>Saldo a pagar</small><strong>'+fmt(balanceToPay)+'</strong></div></div>'+
-  '<p class="mobile-form-note">'+filtered.length+' fechamento(s) no filtro aplicado. Adiantamentos integram a comissão gerada e reduzem apenas o saldo a pagar.</p>';
- const list=filtered.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.bruto)+'</strong>'+
+ const history=await rpc('apiCommissionHistory',token,{...filters,status:''});
+ if(!Array.isArray(history))throw Error('Histórico de fechamentos em formato inesperado.');
+ const professionals=filters.profissional_id
+  ?financeProfessionals.filter(p=>String(p.id)===String(filters.profissional_id))
+  :financeProfessionals;
+ const period={start:filters.start||dates().start,end:filters.end||dates().end};
+ // Pendências de atendimento/venda ainda não possuem fechamento. Consultar a prévia real do backend.
+ const previews=await Promise.all(professionals.map(p=>rpc('apiCommissionPreview',token,{profissional_id:p.id,...period})));
+ let pendingCount=0;
+ let pendingEarned=0;
+ previews.forEach(p=>{
+  if(!p||!Array.isArray(p.items))throw Error('Não foi possível consultar as comissões pendentes.');
+  pendingCount+=p.items.length;
+  pendingEarned+=p.items.reduce((total,x)=>total+Number(x.comissao||0),0);
+ });
+ const historyEarned=history.reduce((total,x)=>total+Number(x.bruto||0),0);
+ const savedAwaiting=history.filter(x=>String(x.status||'').toUpperCase()!=='PAGO');
+ const savedAwaitingAmount=savedAwaiting.reduce((total,x)=>total+Number(x.total||0),0);
+ const visible=filters.status?history.filter(x=>String(x.status||'').toUpperCase()===filters.status):history;
+ const stats='<div class="cash-totals">'+
+  '<div><small>Total de comissões no período</small><strong>'+fmt(historyEarned+pendingEarned)+'</strong></div>'+
+  '<div><small>Comissões sem fechamento</small><strong>'+fmt(pendingEarned)+'</strong></div>'+
+  '<div><small>Fechamentos aguardando pagamento</small><strong>'+fmt(savedAwaitingAmount)+'</strong></div></div>'+
+  '<p class="mobile-form-note">Total do período = comissões de fechamentos existentes + serviços/vendas ainda sem fechamento. '+pendingCount+
+  ' item(ns) sem fechamento. Adiantamentos não reduzem a comissão gerada; o valor de fechamentos aguardando pagamento já considera os vales compensados.</p>';
+ const list=visible.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.bruto)+'</strong>'+
   '<small>'+escapeText(x.inicio)+' a '+escapeText(x.fim)+' · '+escapeText(x.status)+'</small>'+
   '<small>Saldo '+(String(x.status||'').toUpperCase()==='PAGO'?'quitado':('a pagar '+fmt(x.total)))+'</small>'+
-  ((x.status!=='PAGO')?'<button type="button" class="secondary mini" data-finance="payCommission" data-id="'+escapeText(x.id)+'">Pagar comissão</button>':'')+'</div>').join('');
- el.innerHTML=stats+(list||'<p class="notice">Nenhum fechamento encontrado no período.</p>');
+  ((String(x.status||'').toUpperCase()!=='PAGO')?'<button type="button" class="secondary mini" data-finance="payCommission" data-id="'+escapeText(x.id)+'">Pagar comissão</button>':'')+'</div>').join('');
+ el.innerHTML=stats+panel('Fechamentos registrados',list||'<p class="notice">Nenhum fechamento registrado neste filtro. As comissões de atendimentos pendentes aparecem acima.</p>');
 }
+
 function renderCommissionDraft(){
  const box=$('closePreview');if(!box||!commissionDraft)return;
  const items=commissionDraft.items||[],adv=commissionDraft.advances||[];
