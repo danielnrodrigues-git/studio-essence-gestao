@@ -907,9 +907,14 @@ const pushSupported=()=>window.isSecureContext&&'serviceWorker'in navigator&&'Pu
 const pushMessage=message=>{if($('pushFeedback'))$('pushFeedback').textContent=message||''};
 async function pushRpc(action,data={}){
  if(!token)throw Error('Entre novamente para gerenciar o PUSH.');
- const response=await fetch(PUSH_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY},body:JSON.stringify({action,token,...data})});
+ let response;
+ try {
+  response=await fetch(PUSH_URL,{method:'POST',mode:'cors',cache:'no-store',headers:{'Content-Type':'application/json',apikey:KEY},body:JSON.stringify({action,token,...data})});
+ } catch(error) {
+  throw Error('Falha de conexão com o serviço PUSH. Verifique sua internet e tente novamente. Detalhe: '+String(error?.message||error)+' · Origem: '+location.hostname);
+ }
  const json=await response.json().catch(()=>null);
- if(!response.ok||!json?.ok)throw Error(json?.error||'Não foi possível conectar ao serviço PUSH.');
+ if(!response.ok||!json?.ok)throw Error(json?.error||'Serviço PUSH retornou HTTP '+response.status+'.');
  return json;
 }
 const pushKeyBytes=value=>{
