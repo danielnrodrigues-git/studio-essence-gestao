@@ -2321,7 +2321,7 @@ tr.appendChild(td);body.appendChild(tr);
   }catch(e){alert('Não foi possível registrar o aporte: '+(e.message||e))}
   finally{btn.disabled=false}
  }
- const observer=new MutationObserver(()=>{if(byId('bank-pane-transfers')&&!byId('aportesControleV1')&&adminReady())setup()});
+ const observer=new MutationObserver(()=>{if(byId('bank-pane-transfers')&&!byId('aportesControleV1')&&adminReady())setup();if(byId('aportesControleV1')&&byId('contribAccountV172')?.options.length>1&&byId('aportesContaSaidaV1')?.options.length<=1)accounts()});
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{observer.observe(document.body,{childList:true,subtree:true});setup()});
  else{observer.observe(document.body,{childList:true,subtree:true});setup()}
 })();
