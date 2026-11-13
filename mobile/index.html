@@ -576,6 +576,7 @@ $('results').addEventListener('change',ev=>{
 });
 
 let financeMode='',financeTab='',financeBank=null,financeProfessionals=[],commissionDraft=null,financeBusy=false;
+let commissionHistoryFilters=null;
 const euro=x=>Number(x||0);
 const moneyInput=id=>{const raw=String($(id)?.value||'').replace(/\s/g,'').replace('R$','');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)};
 const gv=id=>String($(id)?.value||'').trim();
@@ -631,9 +632,15 @@ async function selectFinanceTab(tab){
 async function renderCommissionTab(tab){
  const d=dates();
  if(tab==='history'){
-  const rows=await rpc('apiCommissionHistory',token,{profissional_id:'',start:d.start,end:d.end,status:''});
-  if(!Array.isArray(rows))throw Error('Histórico de fechamentos em formato inesperado.');
-  $('financeBody').innerHTML=panel('Histórico de fechamentos',rows.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.total)+'</strong><small>'+escapeText(x.inicio)+' a '+escapeText(x.fim)+' · '+escapeText(x.status)+'</small>'+((x.status!=='PAGO')?'<button type="button" class="secondary mini" data-finance="payCommission" data-id="'+escapeText(x.id)+'">Pagar comissão</button>':'')+'</div>').join('')||'<p class="notice">Nenhum fechamento no período.</p>');
+  const filters=commissionHistoryFilters||{profissional_id:'',start:d.start,end:d.end,status:''};
+  commissionHistoryFilters={...filters};
+  $('financeBody').innerHTML=panel('Filtrar fechamentos',
+    choose('historyProf','Profissional','<option value="">Todas as profissionais</option>'+profOptions(filters.profissional_id))+
+    '<div class="mobile-grid">'+fld('historyStart','De','date',filters.start)+fld('historyEnd','Até','date',filters.end)+'</div>'+
+    choose('historyStatus','Situação',opt(['','ABERTO','PAGO'],filters.status).replace('<option value="">','<option value="">Todos os status'))+
+    act('filterCommission','Aplicar filtros')+'<p class="mobile-form-note">O total considera apenas fechamentos que correspondem aos filtros selecionados.</p>')+
+    '<div id="historyCommissionResults"><p class="notice">Consultando fechamentos…</p></div>');
+  await loadCommissionHistoryResults();
  }
  if(tab==='advance'){
   const advances=await rpc('apiListAdvances',token,{profissional_id:'',start:d.start,end:d.end});
@@ -650,13 +657,32 @@ async function renderCommissionTab(tab){
   $('financeBody').innerHTML=panel('Fechamento de comissão',choose('closeProf','Profissional',profOptions())+'<div class="mobile-grid">'+fld('closeStart','De','date',d.start)+fld('closeEnd','Até','date',d.end)+'</div>'+act('previewCommission','Carregar serviços, vendas e vales')+'<p class="mobile-form-note">Revise os itens, taxas, ajustes e vales antes de salvar ou pagar.</p>')+'<div id="closePreview"></div>';
  }
 }
+async function loadCommissionHistoryResults(){
+ const el=$('historyCommissionResults');if(!el)return;
+ const filters=commissionHistoryFilters||{};
+ const rows=await rpc('apiCommissionHistory',token,filters);
+ if(!Array.isArray(rows))throw Error('Histórico de fechamentos em formato inesperado.');
+ const filtered=filters.status?rows.filter(x=>String(x.status||'').toUpperCase()===filters.status):rows;
+ const sum=(key)=>filtered.reduce((n,x)=>n+Number(x[key]||0),0);
+ const unpaid=filtered.filter(x=>String(x.status||'').toUpperCase()!=='PAGO');
+ const pending=unpaid.reduce((n,x)=>n+Number(x.total||0),0);
+ const stats='<div class="cash-totals"><div><small>Comissões brutas filtradas</small><strong>'+fmt(sum('bruto'))+'</strong></div>'+
+  '<div><small>Total líquido filtrado</small><strong>'+fmt(sum('total'))+'</strong></div>'+
+  '<div><small>Aguardando pagamento</small><strong>'+fmt(pending)+'</strong></div></div>'+
+  '<p class="mobile-form-note">'+filtered.length+' fechamento(s) no filtro aplicado. Valores de fechamentos já salvos, sem duplicar serviços pendentes.</p>';
+ const list=filtered.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.total)+'</strong>'+
+  '<small>'+escapeText(x.inicio)+' a '+escapeText(x.fim)+' · '+escapeText(x.status)+'</small>'+
+  '<small>Bruto '+fmt(x.bruto)+' · Vales '+fmt(x.vales)+'</small>'+
+  ((x.status!=='PAGO')?'<button type="button" class="secondary mini" data-finance="payCommission" data-id="'+escapeText(x.id)+'">Pagar comissão</button>':'')+'</div>').join('');
+ el.innerHTML=stats+(list||'<p class="notice">Nenhum fechamento encontrado no período.</p>');
+}
 function renderCommissionDraft(){
  const box=$('closePreview');if(!box||!commissionDraft)return;
  const items=commissionDraft.items||[],adv=commissionDraft.advances||[];
  let html=panel('Itens para fechamento',items.map((x,i)=>'<div class="mobile-entry" data-citem="'+i+'"><label class="inline-check"><input type="checkbox" class="c-on" checked> <strong>'+escapeText(x.descricao||'Item')+'</strong></label><small>'+escapeText(x.cliente||'')+' · '+escapeText(x.data||'')+' · '+escapeText(x.source_type||'')+'</small><div class="mobile-grid">'+fld('cbase-'+i,'Base (R$)','number',euro(x.base),'step="0.01" inputmode="decimal" class="c-base"')+fld('cpct-'+i,'Comissão (%)','number',(euro(x.percentual)*100).toFixed(2),'step="0.01" inputmode="decimal" class="c-pct"')+'</div><div class="mobile-grid">'+fld('cref-'+i,'Valor de referência (R$)','number',euro(x.valor_referencia),'step="0.01" inputmode="decimal" class="c-ref"')+fld('ccomm-'+i,'Valor da comissão (R$)','number',euro(Number(x.comissao??(Number(x.base||0)*Number(x.percentual||0)))),'step="0.01" inputmode="decimal" class="c-commission" readonly tabindex="-1"')+'</div></div>').join('')||'<p class="notice">Nenhum serviço ou venda pendente neste período.</p>');
- if(!items.length){box.innerHTML=html;return;}
+ if(!items.length){box.innerHTML=html+panel('Total de comissões filtradas','<div class="cash-totals"><div><small>Comissões pendentes no filtro</small><strong>'+fmt(0)+'</strong></div></div>');return;}
  if(adv.length)html+=panel('Vales disponíveis para compensação',adv.map((x,i)=>'<div class="mobile-entry" data-cadv="'+i+'"><label class="inline-check"><input type="checkbox" class="a-on" checked> '+escapeText(x.observacoes||'Vale / adiantamento')+'</label><small>Saldo disponível: '+fmt(x.saldo)+'</small>'+fld('ause-'+i,'Abater (R$)','number',euro(x.saldo),'step="0.01" inputmode="decimal" class="a-use"')+'</div>').join(''));
- html+=panel('Resumo e confirmação',fld('closeAdjustment','Ajuste manual (R$), + bônus / − desconto','number','0','step="0.01" inputmode="decimal"')+fld('closeAdjustmentDesc','Descrição do ajuste')+'<div id="closeTotals" class="notice"></div>'+fld('closePayDate','Data de pagamento','date',dates().end)+choose('closePayMethod','Forma de pagamento',opt(['Pix','Dinheiro','Débito','Crédito']))+'<div class="actionline">'+act('saveClosing','Salvar fechamento','secondary')+act('payClosing','Fechar e pagar')+'</div><p class="mobile-form-note">Salvar não paga a comissão. Fechar e pagar registra a saída financeira.</p>');
+ html+=panel('Resumo e confirmação','<div id="closeFilteredSummary" class="cash-totals" aria-live="polite"></div>'+fld('closeAdjustment','Ajuste manual (R$), + bônus / − desconto','number','0','step="0.01" inputmode="decimal"')+fld('closeAdjustmentDesc','Descrição do ajuste')+'<div id="closeTotals" class="notice"></div>'+fld('closePayDate','Data de pagamento','date',dates().end)+choose('closePayMethod','Forma de pagamento',opt(['Pix','Dinheiro','Débito','Crédito']))+'<div class="actionline">'+act('saveClosing','Salvar fechamento','secondary')+act('payClosing','Fechar e pagar')+'</div><p class="mobile-form-note">Salvar não paga a comissão. Fechar e pagar registra a saída financeira.</p>');
  box.innerHTML=html;calcCommissionDraft();
 }
 function collectDraft(){
@@ -692,7 +718,13 @@ function calcCommissionDraft(){
   });
   if(!$('closeTotals'))return;
   const x=collectDraft();
-  $('closeTotals').textContent='Bruto '+fmt(x.gross)+' · Vales '+fmt(x.advances.reduce((sum,a)=>sum+a.valor,0))+' · Líquido '+fmt(x.net)
+  const commissionOnly=x.items.reduce((sum,item)=>sum+Number(item.comissao||0),0);
+  const advancesUsed=x.advances.reduce((sum,a)=>sum+a.valor,0);
+  const summary=$('closeFilteredSummary');
+  if(summary)summary.innerHTML='<div><small>Total de comissões filtradas</small><strong>'+fmt(commissionOnly)+'</strong></div>'+
+    '<div><small>Vales compensados</small><strong>'+fmt(advancesUsed)+'</strong></div>'+
+    '<div><small>Valor líquido a pagar</small><strong>'+fmt(x.net)+'</strong></div>';
+  $('closeTotals').textContent='Comissões '+fmt(commissionOnly)+' · Ajuste '+fmt(x.adjustment)+' · Vales '+fmt(advancesUsed)+' · Líquido '+fmt(x.net);
  }catch(e){if($('closeTotals'))$('closeTotals').textContent=e.message}
 }
 
@@ -764,6 +796,12 @@ async function renderBankTab(tab){
 
 async function financeAction(action,id){
  const today=dates().end;
+ if(action==='filterCommission'){
+  const filters={profissional_id:gv('historyProf'),start:gv('historyStart'),end:gv('historyEnd'),status:gv('historyStatus')};
+  if(filters.start&&filters.end&&filters.start>filters.end)throw Error('A data inicial não pode ser maior que a final.');
+  commissionHistoryFilters=filters;
+  await safeWrite(()=>loadCommissionHistoryResults(),'Filtros aplicados.');return;
+ }
  if(action==='previewCommission'){
   if(!gv('closeProf')||!gv('closeStart')||!gv('closeEnd')){vmsg('Informe a profissional e o período.',true);return}
   if(gv('closeStart')>gv('closeEnd')){vmsg('A data inicial não pode ser maior que a final.',true);return}
