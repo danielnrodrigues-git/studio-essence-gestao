@@ -65,6 +65,10 @@
 #app.se-xmas-season .se-xmas-mobile-lights svg g:nth-of-type(2) circle:nth-child(even){animation:seMobileChristmasGlowB 3.6s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){#app.se-xmas-season .se-xmas-mobile-lights svg g ellipse,#app.se-xmas-season .se-xmas-mobile-lights svg g circle{animation:none!important}}
 @media(max-height:700px){#login .se-xmas-logo-frame{width:140px;height:140px}#login.se-xmas-season .se-xmas-login-art{height:54px}}
+.push-pilot{margin:14px 0;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.push-pilot strong{display:block;font-size:14px;color:var(--deep)}.push-pilot p{margin:6px 0 12px;font-size:12px;line-height:1.5;color:var(--muted)}
+.push-pilot-actions{display:flex;gap:8px;flex-wrap:wrap}.push-pilot-actions button{border-radius:10px;padding:10px 12px;font-size:12px}
+.push-pilot .secondary{background:transparent}.push-pilot button:disabled{opacity:.45}.push-pilot-status{font-size:12px;margin-top:10px;line-height:1.45}
 </style></head><body>
 <section id="login" class="login-screen">
 <div id="installLogin" class="install-banner hidden" role="region" aria-label="Instalar Studio Essence">
@@ -96,7 +100,7 @@
 <div class="card wide revenue-hero"><div class="revenue-label"><span>Faturamento do mês</span><span class="revenue-tag">MÊS ATUAL</span></div><div class="amount" id="gross">—</div><div id="revenueComparison" class="revenue-comparison">Comparativo com o mês anterior: —</div></div>
 <div class="card"><label>Comissões a pagar</label><div class="amount" id="commission">—</div></div>
 <div class="card"><label>Saldo disponível</label><div class="amount positive" id="available">—</div></div>
-</div><h2 class="section-title">Acesso rápido</h2><div class="actions">
+</div><section class="push-pilot hidden" id="pushPilot" aria-label="Notificações piloto"><strong>Notificações PUSH · Piloto individual</strong><p id="pushHint">Somente sua assinatura poderá receber notificações. Nenhum envio automático está ativo.</p><div class="push-pilot-actions"><button class="primary" id="pushEnable" type="button">Ativar notificações</button><button class="secondary hidden" id="pushTest" type="button">Enviar teste</button><button class="secondary hidden" id="pushDisable" type="button">Desativar</button></div><div class="push-pilot-status" id="pushFeedback" aria-live="polite"></div></section><h2 class="section-title">Acesso rápido</h2><div class="actions">
 <button class="action" data-page="commissions"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 20c.5-4 2.5-6 5.5-6s5 2 5.5 6M10.5 20c.4-3.3 2.3-5 5.5-5s5.1 1.7 5.5 5"/></svg></span>Comissões</button>
 <button class="action" data-page="cash"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg></span>Fluxo de Caixa</button>
 <button class="action" data-page="expenses"><span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span>Despesas</button>
@@ -141,7 +145,7 @@ async function completeMobileLogin(session){
  if(String(user?.perfil||user?.role||'').toUpperCase()!=='ADMIN')throw Error('Acesso financeiro mobile disponível somente para administradores nesta versão.');
  $('login').classList.add('hidden');$('app').classList.remove('hidden');
  $('hello').textContent='Olá, '+(user.nome||user.name||'Administrador');
- $('pin').value='';openPage('home');await refreshBiometricStatus();
+ $('pin').value='';openPage('home');void pushRefresh();await refreshBiometricStatus();
 }
 async function login(e){
  e.preventDefault();const button=$('loginBtn');button.disabled=true;$('loginError').textContent='';
@@ -892,6 +896,89 @@ $('results').addEventListener('input',e=>{
 
 function openPage(p){if((p==='expenses'||p==='revenues')&&page!==p){$('start').value='';$('end').value='';}else if(p==='cash'&&page!=='cash'){const d=dates();$('start').value=d.start;$('end').value=d.end;}page=p;$('home').classList.toggle('hidden',p!=='home');$('detail').classList.toggle('hidden',p==='home');$('navHome').classList.toggle('active',p==='home');document.querySelectorAll('.bottom [data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p!=='home')$('detailTitle').textContent=sections[p];const filters=p==='cash'||p==='expenses'||p==='revenues';document.querySelector('#detail .filter-row').classList.toggle('hidden',!filters);$('search').classList.toggle('hidden',!filters);loadPage();window.scrollTo(0,0)}
 $('loginForm').addEventListener('submit',login);$('logout').onclick=()=>showLogin();$('back').onclick=()=>openPage('home');$('navHome').onclick=()=>openPage('home');$('search').onclick=()=>page==='expenses'?expenseQuery():page==='revenues'?revenueQuery():loadPage();document.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
+
+
+/* PUSH: piloto de uma única assinatura, travado novamente no servidor. */
+const PUSH_URL='https://mvtwejkxjrxbsuteemxj.supabase.co/functions/v1/studio-push';
+const PUSH_PILOT_USER='USR-624608B2';
+let pushPublicKey='',pushBusy=false,pushServerEndpoint='';
+const pushEligible=()=>String(user?.id||'')===PUSH_PILOT_USER;
+const pushSupported=()=>window.isSecureContext&&'serviceWorker'in navigator&&'PushManager'in window&&'Notification'in window;
+const pushMessage=message=>{if($('pushFeedback'))$('pushFeedback').textContent=message||''};
+async function pushRpc(action,data={}){
+ if(!token)throw Error('Entre novamente para gerenciar o PUSH.');
+ const response=await fetch(PUSH_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY},body:JSON.stringify({action,token,...data})});
+ const json=await response.json().catch(()=>null);
+ if(!response.ok||!json?.ok)throw Error(json?.error||'Não foi possível conectar ao serviço PUSH.');
+ return json;
+}
+const pushKeyBytes=value=>{
+ let input=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
+ input+='='.repeat((4-input.length%4)%4);
+ return Uint8Array.from(atob(input),c=>c.charCodeAt(0));
+};
+async function pushRefresh(){
+ const panel=$('pushPilot');if(!panel)return;
+ panel.classList.toggle('hidden',!pushEligible());
+ if(!pushEligible())return;
+ $('pushEnable').classList.remove('hidden');$('pushTest').classList.add('hidden');$('pushDisable').classList.add('hidden');
+ if(!pushSupported()){
+  $('pushEnable').disabled=true;
+  pushMessage(isIOS()&&!standalone()?'No iPhone, instale o app na Tela de Início e abra pelo ícone para ativar o PUSH.':'Seu navegador ou dispositivo não suporta PUSH neste modo.');
+  return;
+ }
+ if(Notification.permission==='denied'){
+  $('pushEnable').disabled=true;pushMessage('Notificações bloqueadas. Autorize-as nas configurações do navegador ou do aplicativo.');return;
+ }
+ try{
+  const data=await pushRpc('status');
+  pushPublicKey=data.publicKey||'';pushServerEndpoint=data.endpoint||'';
+  const reg=await navigator.serviceWorker.ready;
+  const local=await reg.pushManager.getSubscription();
+  const active=!!(local&&data.active&&local.endpoint===data.endpoint&&Notification.permission==='granted');
+  $('pushEnable').classList.toggle('hidden',active);
+  $('pushTest').classList.toggle('hidden',!active);
+  $('pushDisable').classList.toggle('hidden',!active);
+  $('pushEnable').disabled=false;
+  pushMessage(active?'Assinatura ativa neste aparelho. Os testes serão enviados somente para ela.':data.active?'Há uma assinatura piloto em outro aparelho. Ativar aqui substituirá a anterior.':'Notificações desativadas. Ative quando desejar.');
+ }catch(e){pushMessage(e?.message||String(e));}
+}
+async function pushWithBusy(action){
+ if(pushBusy)return;pushBusy=true;
+ ['pushEnable','pushTest','pushDisable'].forEach(id=>{if($(id))$(id).disabled=true});
+ try{
+  if(action==='subscribe'){
+   if(!pushSupported())throw Error('PUSH não suportado neste aparelho.');
+   if(isIOS()&&!standalone())throw Error('No iPhone, instale o aplicativo na Tela de Início antes de ativar.');
+   // A permissão é solicitada exclusivamente por gesto do usuário.
+   const permission=await Notification.requestPermission();
+   if(permission!=='granted')throw Error('Permissão de notificações não concedida.');
+   const reg=await navigator.serviceWorker.ready;
+   if(!pushPublicKey)pushPublicKey=(await pushRpc('status')).publicKey;
+   const existing=await reg.pushManager.getSubscription();
+   const sub=existing||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushKeyBytes(pushPublicKey)});
+   try{await pushRpc('subscribe',{subscription:sub.toJSON()});}
+   catch(e){if(!existing)await sub.unsubscribe().catch(()=>{});throw e;}
+   pushMessage('Assinatura PUSH ativada com sucesso.');
+  }else if(action==='test'){
+   await pushRpc('test');pushMessage('Teste enviado ao serviço PUSH. Confira a notificação no aparelho.');
+  }else if(action==='unsubscribe'){
+   await pushRpc('unsubscribe');
+   const reg=await navigator.serviceWorker.ready;
+   const sub=await reg.pushManager.getSubscription();
+   if(sub)await sub.unsubscribe();
+   pushMessage('Assinatura PUSH desativada.');
+  }
+ }catch(e){pushMessage(e?.message||String(e));}
+ finally{
+  pushBusy=false;
+  if(action!=='test')await pushRefresh();
+  else ['pushEnable','pushTest','pushDisable'].forEach(id=>{if($(id))$(id).disabled=false});
+ }
+}
+$('pushEnable').addEventListener('click',()=>pushWithBusy('subscribe'));
+$('pushTest').addEventListener('click',()=>pushWithBusy('test'));
+$('pushDisable').addEventListener('click',()=>pushWithBusy('unsubscribe'));
 
 const PASSKEY_URL='https://mvtwejkxjrxbsuteemxj.supabase.co/functions/v1/studio-passkey';
 const passkeySupported=()=>window.isSecureContext&&typeof window.PublicKeyCredential!=='undefined'&&!!navigator.credentials;
