@@ -663,16 +663,15 @@ async function loadCommissionHistoryResults(){
  const rows=await rpc('apiCommissionHistory',token,filters);
  if(!Array.isArray(rows))throw Error('Histórico de fechamentos em formato inesperado.');
  const filtered=filters.status?rows.filter(x=>String(x.status||'').toUpperCase()===filters.status):rows;
- const sum=(key)=>filtered.reduce((n,x)=>n+Number(x[key]||0),0);
- const unpaid=filtered.filter(x=>String(x.status||'').toUpperCase()!=='PAGO');
- const pending=unpaid.reduce((n,x)=>n+Number(x.total||0),0);
- const stats='<div class="cash-totals"><div><small>Comissões brutas filtradas</small><strong>'+fmt(sum('bruto'))+'</strong></div>'+
-  '<div><small>Total líquido filtrado</small><strong>'+fmt(sum('total'))+'</strong></div>'+
-  '<div><small>Aguardando pagamento</small><strong>'+fmt(pending)+'</strong></div></div>'+
-  '<p class="mobile-form-note">'+filtered.length+' fechamento(s) no filtro aplicado. Valores de fechamentos já salvos, sem duplicar serviços pendentes.</p>';
- const list=filtered.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.total)+'</strong>'+
+ const totalCommission=filtered.reduce((n,x)=>n+Number(x.bruto||0),0);
+ const outstanding=filtered.filter(x=>String(x.status||'').toUpperCase()!=='PAGO');
+ const balanceToPay=outstanding.reduce((n,x)=>n+Number(x.total||0),0);
+ const stats='<div class="cash-totals"><div><small>Total de comissões</small><strong>'+fmt(totalCommission)+'</strong></div>'+
+  '<div><small>Saldo a pagar</small><strong>'+fmt(balanceToPay)+'</strong></div></div>'+
+  '<p class="mobile-form-note">'+filtered.length+' fechamento(s) no filtro aplicado. Adiantamentos integram a comissão gerada e reduzem apenas o saldo a pagar.</p>';
+ const list=filtered.map(x=>'<div class="mobile-entry"><strong>'+escapeText(x.profissional||'Profissional')+' · '+fmt(x.bruto)+'</strong>'+
   '<small>'+escapeText(x.inicio)+' a '+escapeText(x.fim)+' · '+escapeText(x.status)+'</small>'+
-  '<small>Bruto '+fmt(x.bruto)+' · Vales '+fmt(x.vales)+'</small>'+
+  '<small>Saldo '+(String(x.status||'').toUpperCase()==='PAGO'?'quitado':('a pagar '+fmt(x.total)))+'</small>'+
   ((x.status!=='PAGO')?'<button type="button" class="secondary mini" data-finance="payCommission" data-id="'+escapeText(x.id)+'">Pagar comissão</button>':'')+'</div>').join('');
  el.innerHTML=stats+(list||'<p class="notice">Nenhum fechamento encontrado no período.</p>');
 }
