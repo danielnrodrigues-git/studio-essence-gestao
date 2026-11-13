@@ -638,7 +638,7 @@ async function renderCommissionTab(tab){
     choose('historyProf','Profissional','<option value="">Todas as profissionais</option>'+profOptions(filters.profissional_id))+
     '<div class="mobile-grid">'+fld('historyStart','De','date',filters.start)+fld('historyEnd','Até','date',filters.end)+'</div>'+
     choose('historyStatus','Situação',opt(['','ABERTO','PAGO'],filters.status).replace('<option value="">','<option value="">Todos os status'))+
-    act('filterCommission','Aplicar filtros')+'<p class="mobile-form-note">O total considera apenas fechamentos que correspondem aos filtros selecionados.</p>')+
+    act('filterCommission','Aplicar filtros')+'<p class="mobile-form-note">O total considera apenas fechamentos que correspondem aos filtros selecionados.</p>'+
     '<div id="historyCommissionResults"><p class="notice">Consultando fechamentos…</p></div>');
   await loadCommissionHistoryResults();
  }
