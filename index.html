@@ -2220,7 +2220,7 @@ tr.appendChild(td);body.appendChild(tr);
   const root=byId('bank-pane-transfers');
   if(!root||byId('aportesControleV1'))return;
   const el=document.createElement('div');el.id='aportesControleV1';el.className='card';
-  el.innerHTML=\`
+  el.innerHTML=`
   <div class="toolbar"><div style="margin-right:auto"><h3 style="margin:0">Aportes reembolsáveis e devoluções</h3>
   <div class="se-aportes-note">Controle iniciado com o aporte de R$ 400,00 da Thatiana em 10/11/2026. Os aportes antigos não são incluídos.</div></div>
   <button class="btn soft" id="aportesAtualizarV1" type="button">Atualizar saldos</button></div>
@@ -2244,7 +2244,7 @@ tr.appendChild(td);body.appendChild(tr);
   </div>
   <div style="margin-top:14px"><h4 style="margin:0 0 8px">Saldos e histórico por aporte</h4><div id="aportesHistoricoV1">Carregando...</div></div>
   <div class="se-aportes-notice" style="margin-top:14px">Para registrar novos aportes reembolsáveis, utilize os campos de “Aporte real de sócio” acima, informe o titular e clique em “Registrar aporte reembolsável”. Para aportes de capital sem devolução, continue usando “Registrar aporte”.</div>
-  \`;
+  `;
   root.appendChild(el);
   const oldButton=byId('contribDescV172')?.closest('.card')?.querySelector('button[onclick*="saveContributionV172"]');
   if(oldButton)oldButton.textContent='Registrar aporte não reembolsável';
@@ -2280,12 +2280,12 @@ tr.appendChild(td);body.appendChild(tr);
    sel.innerHTML='<option value="">Selecione um aporte...</option>';
    records.filter(a=>Number(a.saldo)>0).forEach(a=>sel.add(new Option(a.titular+' • '+moneyValue(a.saldo)+' restantes • '+a.data,a.id)));
    if(last&&[...sel.options].some(x=>x.value===last))sel.value=last;
-   byId('aportesHistoricoV1').innerHTML=records.length?records.map(a=>\`
+   byId('aportesHistoricoV1').innerHTML=records.length?records.map(a=>`
     <div class="se-aportes-detail"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <strong>\${escaped(a.titular)} — \${escaped(a.data)}</strong><strong style="color:#075333">Saldo \${moneyValue(a.saldo)}</strong></div>
-    <div class="se-aportes-note">\${escaped(a.descricao)} · Aportado \${moneyValue(a.valor_original)} · Devolvido \${moneyValue(a.valor_devolvido)}</div>
-    \${a.historico.length?'<details style="margin-top:6px"><summary style="cursor:pointer">Ver devoluções ('+a.historico.length+')</summary><div>'+a.historico.map(h=>'<div class="se-aportes-note" style="padding:4px 0">'+escaped(h.data)+' — '+moneyValue(h.valor)+' — '+escaped(h.descricao)+'</div>').join('')+'</div></details>':''}
-    </div>\`).join(''):'Nenhum aporte reembolsável cadastrado.';
+    <strong>${escaped(a.titular)} — ${escaped(a.data)}</strong><strong style="color:#075333">Saldo ${moneyValue(a.saldo)}</strong></div>
+    <div class="se-aportes-note">${escaped(a.descricao)} · Aportado ${moneyValue(a.valor_original)} · Devolvido ${moneyValue(a.valor_devolvido)}</div>
+    ${a.historico.length?'<details style="margin-top:6px"><summary style="cursor:pointer">Ver devoluções ('+a.historico.length+')</summary><div>'+a.historico.map(h=>'<div class="se-aportes-note" style="padding:4px 0">'+escaped(h.data)+' — '+moneyValue(h.valor)+' — '+escaped(h.descricao)+'</div>').join('')+'</div></details>':''}
+    </div>`).join(''):'Nenhum aporte reembolsável cadastrado.';
   }catch(e){if(byId('aportesHistoricoV1'))byId('aportesHistoricoV1').textContent='Erro ao carregar saldos: '+(e.message||e)}
   finally{loading=false;if(refreshBtn)refreshBtn.disabled=false}
  }
