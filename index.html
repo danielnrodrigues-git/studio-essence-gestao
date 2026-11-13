@@ -2190,5 +2190,141 @@ tr.appendChild(td);body.appendChild(tr);
  else enhanceBrand();
 })();
 </script>
+
+<style id="studio-aportes-controle-v1-css">
+#aportesControleV1{margin-top:14px}
+#aportesControleV1 .se-aportes-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#aportesControleV1 .se-aportes-card{background:var(--card,#fff);border:1px solid var(--line,#e5ddd0);border-radius:12px;padding:15px}
+#aportesControleV1 .se-aportes-summary{font-weight:750;font-size:22px;color:#075333}
+#aportesControleV1 .se-aportes-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+#aportesControleV1 .se-aportes-fields label{display:block;font-size:12px;font-weight:650;margin-bottom:4px}
+#aportesControleV1 input,#aportesControleV1 select{width:100%;min-width:0;box-sizing:border-box}
+#aportesControleV1 .se-aportes-detail{border-bottom:1px solid var(--line,#eee);padding:10px 0}
+#aportesControleV1 .se-aportes-detail:last-child{border-bottom:0}
+#aportesControleV1 .se-aportes-note{font-size:12px;color:var(--muted,#666)}
+#aportesControleV1 .se-aportes-notice{padding:10px;border-radius:8px;background:#f5efe4;font-size:12px;margin:8px 0}
+@media(max-width:750px){#aportesControleV1 .se-aportes-grid,#aportesControleV1 .se-aportes-fields{grid-template-columns:1fr}}
+</style>
+<script id="studio-aportes-controle-v1-js">
+(function(){
+ 'use strict';
+ const byId=id=>document.getElementById(id);
+ const moneyValue=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ const escaped=t=>String(t??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+ const isoDate=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const p={};parts.forEach(x=>p[x.type]=x.value);return p.year+'-'+p.month+'-'+p.day};
+ const parseMoney=v=>{let s=String(v||'').replace(/[^\d,.-]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Number(s)};
+ let records=[],loading=false;
+ const gsCall=(name,...args)=>window.__studioMigrationBridge.rpc(name,args);
+ function adminReady(){try{return typeof isAdmin==='function'&&isAdmin()&&typeof STATE!=='undefined'&&Boolean(STATE.token)}catch(e){return false}}
+ function setup(){
+  const root=byId('bank-pane-transfers');
+  if(!root||byId('aportesControleV1'))return;
+  const el=document.createElement('div');el.id='aportesControleV1';el.className='card';
+  el.innerHTML=\`
+  <div class="toolbar"><div style="margin-right:auto"><h3 style="margin:0">Aportes reembolsáveis e devoluções</h3>
+  <div class="se-aportes-note">Controle iniciado com o aporte de R$ 400,00 da Thatiana em 10/11/2026. Os aportes antigos não são incluídos.</div></div>
+  <button class="btn soft" id="aportesAtualizarV1" type="button">Atualizar saldos</button></div>
+  <div class="se-aportes-grid">
+   <div class="se-aportes-card">
+    <div class="se-aportes-note">Saldo total a devolver</div><div id="aportesSaldoV1" class="se-aportes-summary">—</div>
+    <div class="se-aportes-notice">Somente aportes identificados como reembolsáveis geram saldos a devolver. Nenhuma devolução entra em despesas operacionais.</div>
+   </div>
+   <div class="se-aportes-card">
+    <h4 style="margin:0 0 8px">Registrar devolução</h4>
+    <div class="se-aportes-fields">
+     <div><label for="aportesOrigemV1">Aporte / titular</label><select id="aportesOrigemV1"></select></div>
+     <div><label for="aportesContaSaidaV1">Conta de saída</label><select id="aportesContaSaidaV1"></select></div>
+     <div><label for="aportesDataV1">Data da devolução</label><input type="date" id="aportesDataV1"></div>
+     <div><label for="aportesValorV1">Valor a devolver (R$)</label><input type="number" id="aportesValorV1" min="0.01" step="0.01" placeholder="0,00"></div>
+    </div>
+    <label for="aportesDescricaoV1" style="font-size:12px;font-weight:650">Observação (opcional)</label>
+    <input id="aportesDescricaoV1" placeholder="Ex.: devolução parcial à Thatiana">
+    <div style="margin-top:10px"><button class="btn primary" id="aportesDevolverV1" type="button">Registrar devolução</button></div>
+   </div>
+  </div>
+  <div style="margin-top:14px"><h4 style="margin:0 0 8px">Saldos e histórico por aporte</h4><div id="aportesHistoricoV1">Carregando...</div></div>
+  <div class="se-aportes-notice" style="margin-top:14px">Para registrar novos aportes reembolsáveis, utilize os campos de “Aporte real de sócio” acima, informe o titular e clique em “Registrar aporte reembolsável”. Para aportes de capital sem devolução, continue usando “Registrar aporte”.</div>
+  \`;
+  root.appendChild(el);
+  const oldButton=byId('contribDescV172')?.closest('.card')?.querySelector('button[onclick*="saveContributionV172"]');
+  if(oldButton)oldButton.textContent='Registrar aporte não reembolsável';
+  const inputCard=byId('contribDescV172')?.closest('.card');
+  if(inputCard&&!byId('aportesTitularV1')){
+   const holder=document.createElement('div');holder.style.marginTop='10px';
+   holder.innerHTML='<div class="field"><label for="aportesTitularV1">Responsável pelo aporte reembolsável</label><input id="aportesTitularV1" value="Thatiana Senna" placeholder="Nome completo"></div><button type="button" class="btn primary" id="aportesNovoV1" style="margin-top:8px">Registrar aporte reembolsável</button>';
+   inputCard.appendChild(holder);
+   byId('aportesNovoV1').addEventListener('click',registerNew);
+  }
+  byId('aportesAtualizarV1').addEventListener('click',refresh);
+  byId('aportesDevolverV1').addEventListener('click',registerReturn);
+  byId('aportesDataV1').value=isoDate();
+  refresh();
+ }
+ function accounts(){
+  const original=byId('contribAccountV172'),target=byId('aportesContaSaidaV1');
+  if(!target||!original)return;
+  const saved=target.value;
+  target.innerHTML='<option value="">Selecione uma conta...</option>';
+  [...original.options].filter(x=>x.value).forEach(x=>target.add(new Option(x.textContent,x.value)));
+  if(saved&&[...target.options].some(x=>x.value===saved))target.value=saved;
+ }
+ async function refresh(){
+  if(!adminReady()||loading)return;
+  loading=true;
+  const refreshBtn=byId('aportesAtualizarV1');if(refreshBtn)refreshBtn.disabled=true;
+  try{
+   accounts();records=await gsCall('apiListRefundableContributionsV1',STATE.token);
+   const total=records.reduce((n,a)=>n+Number(a.saldo||0),0);
+   byId('aportesSaldoV1').textContent=moneyValue(total);
+   const sel=byId('aportesOrigemV1'),last=sel.value;
+   sel.innerHTML='<option value="">Selecione um aporte...</option>';
+   records.filter(a=>Number(a.saldo)>0).forEach(a=>sel.add(new Option(a.titular+' • '+moneyValue(a.saldo)+' restantes • '+a.data,a.id)));
+   if(last&&[...sel.options].some(x=>x.value===last))sel.value=last;
+   byId('aportesHistoricoV1').innerHTML=records.length?records.map(a=>\`
+    <div class="se-aportes-detail"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <strong>\${escaped(a.titular)} — \${escaped(a.data)}</strong><strong style="color:#075333">Saldo \${moneyValue(a.saldo)}</strong></div>
+    <div class="se-aportes-note">\${escaped(a.descricao)} · Aportado \${moneyValue(a.valor_original)} · Devolvido \${moneyValue(a.valor_devolvido)}</div>
+    \${a.historico.length?'<details style="margin-top:6px"><summary style="cursor:pointer">Ver devoluções ('+a.historico.length+')</summary><div>'+a.historico.map(h=>'<div class="se-aportes-note" style="padding:4px 0">'+escaped(h.data)+' — '+moneyValue(h.valor)+' — '+escaped(h.descricao)+'</div>').join('')+'</div></details>':''}
+    </div>\`).join(''):'Nenhum aporte reembolsável cadastrado.';
+  }catch(e){if(byId('aportesHistoricoV1'))byId('aportesHistoricoV1').textContent='Erro ao carregar saldos: '+(e.message||e)}
+  finally{loading=false;if(refreshBtn)refreshBtn.disabled=false}
+ }
+ async function registerReturn(){
+  if(!adminReady())return;
+  const id=byId('aportesOrigemV1').value,account=byId('aportesContaSaidaV1').value,value=parseMoney(byId('aportesValorV1').value),ap=records.find(a=>a.id===id);
+  if(!ap||!account||!(value>0)||value>Number(ap.saldo)){alert('Selecione aporte e conta de saída e informe valor positivo dentro do saldo disponível.');return}
+  if(!confirm('Confirmar devolução de '+moneyValue(value)+' para '+ap.titular+'? Esta operação gera uma saída financeira real.'))return;
+  const btn=byId('aportesDevolverV1');btn.disabled=true;
+  try{
+   await gsCall('apiOperateRefundableContributionV1',STATE.token,'DEVOLVER',{aporte_id:id,valor:value,conta_financeira_id:account,data:byId('aportesDataV1').value,descricao:byId('aportesDescricaoV1').value});
+   byId('aportesValorV1').value='';byId('aportesDescricaoV1').value='';
+   await refresh();
+   if(typeof loadBankingV172==='function')await loadBankingV172();
+   if(typeof loadCashFlow==='function')await loadCashFlow();
+   alert('Devolução registrada no fluxo de caixa.');
+  }catch(e){alert('Não foi possível registrar a devolução: '+(e.message||e))}
+  finally{btn.disabled=false}
+ }
+ async function registerNew(){
+  if(!adminReady())return;
+  const title=byId('aportesTitularV1').value.trim(),amount=parseMoney(byId('contribValueV172').value),account=byId('contribAccountV172').value;
+  if(!title||!(amount>0)||!account){alert('Preencha titular, valor e conta de entrada.');return}
+  if(!confirm('Registrar novo aporte reembolsável de '+moneyValue(amount)+' por '+title+'?'))return;
+  const btn=byId('aportesNovoV1');btn.disabled=true;
+  try{
+   await gsCall('apiOperateRefundableContributionV1',STATE.token,'CRIAR',{titular:title,valor:amount,conta_financeira_id:account,data:byId('contribDateV172').value,descricao:byId('contribDescV172').value});
+   byId('contribValueV172').value='R$ 0,00';
+   if(typeof loadBankingV172==='function')await loadBankingV172();
+   await refresh();
+   if(typeof loadCashFlow==='function')await loadCashFlow();
+   alert('Novo aporte reembolsável registrado.');
+  }catch(e){alert('Não foi possível registrar o aporte: '+(e.message||e))}
+  finally{btn.disabled=false}
+ }
+ const observer=new MutationObserver(()=>{if(byId('bank-pane-transfers')&&!byId('aportesControleV1')&&adminReady())setup()});
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{observer.observe(document.body,{childList:true,subtree:true});setup()});
+ else{observer.observe(document.body,{childList:true,subtree:true});setup()}
+})();
+</script>
 </body>
 </html>
