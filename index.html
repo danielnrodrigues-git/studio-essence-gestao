@@ -2193,6 +2193,12 @@ tr.appendChild(td);body.appendChild(tr);
 
 <style id="studio-aportes-controle-v1-css">
 #aportesControleV1{margin-top:14px}
+.se-aportes-creation{margin-top:12px}
+.se-aportes-creation>.field{margin-bottom:10px}
+.se-aportes-action-row{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+.se-aportes-action-row>.btn{flex:1 1 205px;margin:0!important;min-height:40px;white-space:normal;text-align:center}
+@media(max-width:600px){.se-aportes-action-row>.btn{flex-basis:100%}}
+
 #aportesControleV1 .se-aportes-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 #aportesControleV1 .se-aportes-card{background:var(--card,#fff);border:1px solid var(--line,#e5ddd0);border-radius:12px;padding:15px}
 #aportesControleV1 .se-aportes-summary{font-weight:750;font-size:22px;color:#075333}
@@ -2246,14 +2252,27 @@ tr.appendChild(td);body.appendChild(tr);
   <div class="se-aportes-notice" style="margin-top:14px">Para registrar novos aportes reembolsáveis, utilize os campos de “Aporte real de sócio” acima, informe o titular e clique em “Registrar aporte reembolsável”. Para aportes de capital sem devolução, continue usando “Registrar aporte”.</div>
   `;
   root.appendChild(el);
-  const oldButton=byId('contribDescV172')?.closest('.card')?.querySelector('button[onclick*="saveContributionV172"]');
-  if(oldButton)oldButton.textContent='Registrar aporte não reembolsável';
   const inputCard=byId('contribDescV172')?.closest('.card');
+  const oldButton=inputCard?.querySelector('button[onclick*="saveContributionV172"]');
+  if(oldButton)oldButton.textContent='Registrar aporte não reembolsável';
   if(inputCard&&!byId('aportesTitularV1')){
-   const holder=document.createElement('div');holder.style.marginTop='10px';
-   holder.innerHTML='<div class="field"><label for="aportesTitularV1">Responsável pelo aporte reembolsável</label><input id="aportesTitularV1" value="Thatiana Senna" placeholder="Nome completo"></div><button type="button" class="btn primary" id="aportesNovoV1" style="margin-top:8px">Registrar aporte reembolsável</button>';
-   inputCard.appendChild(holder);
-   byId('aportesNovoV1').addEventListener('click',registerNew);
+   const holder=document.createElement('div');holder.className='se-aportes-creation';
+   holder.innerHTML='<div class="field"><label for="aportesTitularV1">Responsável pelo aporte reembolsável</label><input id="aportesTitularV1" value="Thatiana Senna" placeholder="Nome completo"></div><div class="se-aportes-action-row" id="aportesActionRowV1"></div>';
+   const notice=oldButton?.nextElementSibling;
+   if(oldButton)inputCard.insertBefore(holder,oldButton);
+   else inputCard.appendChild(holder);
+   const actionRow=byId('aportesActionRowV1');
+   if(oldButton){
+    oldButton.classList.remove('primary');
+    oldButton.classList.add('soft');
+    actionRow.appendChild(oldButton);
+   }
+   const newButton=document.createElement('button');
+   newButton.type='button';newButton.className='btn primary';newButton.id='aportesNovoV1';
+   newButton.textContent='Registrar aporte reembolsável';
+   actionRow.appendChild(newButton);
+   newButton.addEventListener('click',registerNew);
+   if(notice&&notice.classList.contains('notice'))holder.after(notice);
   }
   byId('aportesAtualizarV1').addEventListener('click',refresh);
   byId('aportesDevolverV1').addEventListener('click',registerReturn);
