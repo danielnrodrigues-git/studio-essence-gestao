@@ -2345,5 +2345,108 @@ tr.appendChild(td);body.appendChild(tr);
  else{observer.observe(document.body,{childList:true,subtree:true});setup()}
 })();
 </script>
+
+<style id="studio-manual-reconciliation-v1-css">
+#studioReconAdjustmentV1{margin-top:14px;padding:16px;border:1px solid var(--line,#ded4c3);border-radius:12px;background:var(--card,#fff)}
+#studioReconAdjustmentV1 .se-recon-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+#studioReconAdjustmentV1 .se-recon-diff{font-size:23px;font-weight:750}
+#studioReconAdjustmentV1 .se-recon-info{font-size:12px;color:var(--muted,#667)}
+#studioReconAdjustmentV1 textarea{width:100%;min-height:65px;box-sizing:border-box;resize:vertical}
+#studioReconAdjustmentV1 .se-recon-buttons{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+#studioReconAdjustmentV1 .se-recon-buttons button{max-width:100%}
+@media(max-width:650px){#studioReconAdjustmentV1 .se-recon-grid{grid-template-columns:1fr}}
+</style>
+<script id="studio-manual-reconciliation-v1-js">
+(function(){
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\x27':'&#39;'}[c]));
+ let selected=null;
+ const rpc=(name,...args)=>window.__studioMigrationBridge.rpc(name,args);
+ const admin=()=>{try{return typeof isAdmin==='function'&&isAdmin()&&typeof STATE!=='undefined'&&!!STATE.token}catch(e){return false}};
+ function setup(){
+  const host=$('bank-pane-reconcile');
+  if(!host||$('studioReconAdjustmentV1')||!admin())return;
+  const el=document.createElement('div');
+  el.id='studioReconAdjustmentV1';
+  el.innerHTML=`
+    <h3 style="margin:0 0 5px">Ajuste manual de conciliação</h3>
+    <div class="se-recon-info">Primeiro utilize “Comparar / registrar” acima. Em seguida, clique em “Verificar diferença” para conferir o ajuste antes de registrá-lo. Um ajuste corrige o saldo bancário, sem criar receita, despesa ou aporte.</div>
+    <div class="se-recon-buttons"><button class="btn soft" type="button" id="seReconCheckV1">Verificar diferença</button></div>
+    <div id="seReconAdjustmentResultV1" style="margin-top:10px"></div>
+    <div id="seReconAdjustmentActionV1" hidden>
+      <label for="seReconAdjustmentReasonV1" style="font-weight:650;font-size:12px">Justificativa obrigatória</label>
+      <textarea id="seReconAdjustmentReasonV1" placeholder="Ex.: arredondamento de centavos identificado na conferência do extrato da conta"></textarea>
+      <div class="se-recon-buttons"><button class="btn primary" type="button" id="seReconConfirmV1">Registrar ajuste financeiro</button></div>
+      <div class="se-recon-info">Limite por conciliação: R$ 10,00. O saldo da conta e a diferença serão revalidados antes de salvar. Esta ação é auditada.</div>
+    </div>`;
+  host.appendChild(el);
+  $('seReconCheckV1').addEventListener('click',check);
+  $('seReconConfirmV1').addEventListener('click',register);
+  const account=$('reconAccountV172'),date=$('reconDateV172'),external=$('reconExternalV172');
+  [account,date,external].forEach(x=>x&&x.addEventListener('change',invalidate));
+  const compareBtn=host.querySelector('button[onclick*="saveReconciliationV172"]');
+  if(compareBtn)compareBtn.addEventListener('click',invalidate,{capture:true});
+ }
+ function invalidate(){selected=null;if($('seReconAdjustmentActionV1'))$('seReconAdjustmentActionV1').hidden=true;if($('seReconAdjustmentResultV1'))$('seReconAdjustmentResultV1').textContent=''}
+ function numberFromCurrency(raw){
+  let s=String(raw||'').replace(/[^\d.,-]/g,'');
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  return Number(s);
+ }
+ async function check(){
+  if(!admin())return;
+  invalidate();
+  const account=$('reconAccountV172')?.value,date=$('reconDateV172')?.value;
+  const out=$('seReconAdjustmentResultV1');
+  if(!account||!date){out.textContent='Escolha a conta e a data da conciliação.';return}
+  const b=$('seReconCheckV1');b.disabled=true;
+  try{
+    const list=await rpc('apiListReconciliationsV172',STATE.token,{account_id:account});
+    const rows=list.filter(x=>x.data_referencia===date).sort((a,b)=>String(b.criado_em||'').localeCompare(String(a.criado_em||'')));
+    const rec=rows[0];
+    if(!rec){out.textContent='Nenhuma conciliação registrada para esta conta e data. Clique em Comparar / registrar antes.';return}
+    const actualInput=numberFromCurrency($('reconExternalV172').value);
+    if(!Number.isFinite(actualInput)||Math.abs(actualInput-Number(rec.saldo_externo))>0.004){
+      out.textContent='O saldo informado na tela é diferente do último registro. Execute Comparar / registrar novamente.';return
+    }
+    const amount=Math.round(Number(rec.diferenca)*100)/100;
+    out.innerHTML='<div class="se-recon-grid"><div>Saldo do sistema<br><strong>'+money(rec.saldo_sistema)+'</strong></div><div>Saldo informado<br><strong>'+money(rec.saldo_externo)+'</strong></div></div><div>Diferença apurada: <span class="se-recon-diff" style="color:'+(amount<0?'#a12e35':'#075333')+'">'+money(amount)+'</span></div>';
+    if(rec.status==='AJUSTADO'){out.innerHTML+='<div class="notice">Esta conciliação já recebeu um ajuste. Não é permitido lançar outro.</div>';return}
+    if(Math.abs(amount)<0.01){out.innerHTML+='<div class="notice">Sem diferença a ajustar.</div>';return}
+    if(Math.abs(amount)>10){out.innerHTML+='<div class="notice">Diferença maior que R$ 10,00: identifique a origem antes de ajustar.</div>';return}
+    selected={id:rec.id,account,date,amount};
+    $('seReconAdjustmentActionV1').hidden=false;
+  }catch(e){out.textContent='Erro ao consultar conciliação: '+(e.message||e)}
+  finally{b.disabled=false}
+ }
+ async function register(){
+  if(!admin()||!selected)return;
+  const reason=String($('seReconAdjustmentReasonV1')?.value||'').trim();
+  if(reason.length<8){alert('Informe uma justificativa de pelo menos 8 caracteres.');return}
+  const current=selected;
+  if(current.account!==$('reconAccountV172')?.value||current.date!==$('reconDateV172')?.value){
+    invalidate();alert('A conta ou data mudou. Verifique novamente.');return
+  }
+  if(!confirm('Confirmar ajuste de '+money(current.amount)+' na conta selecionada? O saldo financeiro será alterado, sem impactar o resultado operacional.'))return;
+  const btn=$('seReconConfirmV1');btn.disabled=true;
+  try{
+    await rpc('apiAdjustReconciliationManualV1',STATE.token,current.id,reason);
+    invalidate();
+    $('seReconAdjustmentReasonV1').value='';
+    $('seReconAdjustmentResultV1').textContent='Ajuste registrado. O saldo financeiro foi atualizado e a conciliação vinculada ao histórico.';
+    if(typeof loadBankingV172==='function')await loadBankingV172();
+    if(typeof loadCashFlow==='function')await loadCashFlow();
+    if(typeof loadReconciliationsV172==='function')await loadReconciliationsV172();
+  }catch(e){alert('Não foi possível salvar o ajuste: '+(e.message||e))}
+  finally{btn.disabled=false}
+ }
+ const observer=new MutationObserver(()=>{if(!$('studioReconAdjustmentV1')&&$('bank-pane-reconcile')&&admin())setup()});
+ if(document.readyState==='loading'){
+   document.addEventListener('DOMContentLoaded',()=>{observer.observe(document.body,{subtree:true,childList:true});setup()});
+ }else{observer.observe(document.body,{subtree:true,childList:true});setup()}
+})();
+</script>
 </body>
 </html>
