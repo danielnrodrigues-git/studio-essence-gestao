@@ -751,7 +751,7 @@ function calcCommissionDraft(){
 async function refreshBank(){const b=await rpc('apiFinancialBootstrapV172',token);if(!b||!Array.isArray(b.accounts))throw Error('Não foi possível atualizar contas financeiras.');financeBank=b}
 function contributionDate(value){
  const d=String(value||'');
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(d))throw Error('Informe uma data válida.');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(d))throw Error('Informe uma data válida.');
  const date=new Date(d+'T12:00:00');
  if(!Number.isFinite(date.getTime())||[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')!==d)throw Error('Data inválida.');
  if(d>dates().end)throw Error('A data não pode ser futura.');
