@@ -576,6 +576,7 @@ $('results').addEventListener('change',ev=>{
 });
 
 let financeMode='',financeTab='',financeBank=null,financeProfessionals=[],commissionDraft=null,financeBusy=false;
+let financeContributions=[],contributionFormType='',contributionReturnId='';
 let commissionHistoryFilters=null;
 const euro=x=>Number(x||0);
 const moneyInput=id=>{const raw=String($(id)?.value||'').replace(/\s/g,'').replace('R$','');return Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw)};
@@ -748,6 +749,62 @@ function calcCommissionDraft(){
 
 
 async function refreshBank(){const b=await rpc('apiFinancialBootstrapV172',token);if(!b||!Array.isArray(b.accounts))throw Error('Não foi possível atualizar contas financeiras.');financeBank=b}
+function contributionDate(value){
+ const d=String(value||'');
+ if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(d))throw Error('Informe uma data válida.');
+ const date=new Date(d+'T12:00:00');
+ if(!Number.isFinite(date.getTime())||[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')!==d)throw Error('Data inválida.');
+ if(d>dates().end)throw Error('A data não pode ser futura.');
+ return d;
+}
+function renderContributionsMobile(){
+ const d=dates(),arr=financeContributions||[],sum=k=>arr.reduce((total,a)=>total+Number(a[k]||0),0);
+ const amount=sum('valor_original'),returned=sum('valor_devolvido'),balance=sum('saldo');
+ const stats='<div class="cash-totals"><div><small>Total de aportes reembolsáveis</small><strong>'+fmt(amount)+'</strong></div>'+
+  '<div><small>Devoluções realizadas</small><strong>'+fmt(returned)+'</strong></div>'+
+  '<div><small>Saldo disponível para devolução</small><strong>'+fmt(balance)+'</strong></div></div>'+
+  '<p class="mobile-form-note">Aportes e devoluções movimentam as contas financeiras sem alterar o faturamento ou resultado operacional. O saldo é compartilhado com o desktop.</p>';
+ const actions='<div class="actionline">'+act('openContributionNonRefundable','Registrar aporte não reembolsável','secondary')+
+  act('openContributionRefundable','Registrar aporte reembolsável','secondary')+'</div>';
+ let form='';
+ if(contributionFormType==='non'){
+  form=panel('Novo aporte não reembolsável',fld('conDate','Data','date',d.end)+choose('conAccount','Conta de destino',acctOptions())+
+   fld('conValue','Valor (R$)','number','','min="0.01" step="0.01" inputmode="decimal"')+
+   fld('conDesc','Descrição')+'<div class="actionline">'+act('saveContribution','Registrar aporte')+act('cancelContributionForm','Cancelar','secondary')+'</div>'+
+   '<p class="mobile-form-note">Entrada definitiva de recursos do sócio. Não cria saldo de devolução.</p>');
+ }else if(contributionFormType==='refundable'){
+  form=panel('Novo aporte reembolsável',fld('conOwner','Titular / quem realizou o aporte')+
+   fld('conDate','Data','date',d.end)+choose('conAccount','Conta de destino',acctOptions())+
+   fld('conValue','Valor (R$)','number','','min="0.01" step="0.01" inputmode="decimal"')+
+   fld('conDesc','Descrição')+'<div class="actionline">'+act('saveRefundableContribution','Registrar aporte reembolsável')+
+   act('cancelContributionForm','Cancelar','secondary')+'</div>'+
+   '<p class="mobile-form-note">O aporte gera saldo que poderá ser devolvido parcial ou integralmente em outra data.</p>');
+ }else if(contributionFormType==='return'){
+  const contribution=arr.find(a=>String(a.id)===String(contributionReturnId));
+  if(contribution){
+   form=panel('Devolver aporte · '+escapeText(contribution.titular||'Titular'),
+    '<p class="mobile-form-note">Aporte de '+escapeText(String(contribution.data||''))+' · Valor original '+fmt(contribution.valor_original)+
+    ' · Saldo disponível '+fmt(contribution.saldo)+'</p>'+
+    fld('returnConDate','Data da devolução','date',d.end)+choose('returnConAccount','Conta de saída',acctOptions())+
+    fld('returnConValue','Valor da devolução (R$)','number',Number(contribution.saldo||0).toFixed(2),'min="0.01" step="0.01" inputmode="decimal"')+
+    fld('returnConDesc','Descrição / observações')+'<div class="actionline">'+act('saveContributionReturn','Confirmar devolução')+
+    act('cancelContributionForm','Cancelar','secondary')+'</div>'+
+    '<p class="mobile-form-note">A devolução debita a conta selecionada e reduz o saldo do aporte, sem registrar uma despesa operacional.</p>');
+  }
+ }
+ const list=arr.map(a=>{
+  const history=Array.isArray(a.historico)?a.historico:[];
+  return '<div class="mobile-entry"><strong>'+escapeText(a.titular||'Titular')+' · '+fmt(a.saldo)+'</strong>'+
+   '<small>Aporte '+escapeText(String(a.data||''))+' · Original '+fmt(a.valor_original)+' · Devolvido '+fmt(a.valor_devolvido)+'</small>'+
+   (a.descricao?'<small>'+escapeText(a.descricao)+'</small>':'')+
+   '<small>'+((Number(a.saldo||0)>0.004)?'Saldo em aberto':'Aporte totalmente devolvido')+'</small>'+
+   (Number(a.saldo||0)>0.004?'<button type="button" class="secondary mini" data-finance="openContributionReturn" data-id="'+escapeText(a.id)+'">Registrar devolução</button>':'')+
+   (history.length?'<div class="mobile-form-note"><strong>Histórico de devoluções</strong>'+
+    history.map(h=>'<div>'+escapeText(String(h.data||''))+' · '+fmt(h.valor)+(h.descricao?' · '+escapeText(h.descricao):'')+'</div>').join('')+'</div>':'')+
+   '</div>';
+ }).join('')||'<p class="notice">Ainda não há aportes reembolsáveis registrados.</p>';
+ $('financeBody').innerHTML=panel('Aportes e devoluções',stats+actions)+form+panel('Aportes reembolsáveis e saldos',list);
+}
 async function renderBankTab(tab){
  const d=dates(),b=financeBank||{},accounts=b.accounts||[],position=b.position||{};
  if(tab==='balances'){
@@ -762,7 +819,10 @@ async function renderBankTab(tab){
     panel('Transferências do período',rows.map(x=>item((x.conta_origem_nome||'Origem')+' → '+(x.conta_destino_nome||'Destino'),(x.data||'')+' · '+(x.descricao||''),fmt(x.valor))).join('')||'<p class="notice">Nenhuma transferência no período.</p>');
  }
  if(tab==='contrib'){
-  $('financeBody').innerHTML=panel('Registrar aporte',fld('conDate','Data','date',d.end)+choose('conAccount','Conta de destino',acctOptions())+fld('conValue','Valor (R$)','number','','min="0.01" step="0.01" inputmode="decimal"')+fld('conDesc','Descrição')+act('saveContribution','Registrar aporte')+'<p class="mobile-form-note">Aporte é uma entrada de recursos do sócio e não deve ser confundido com faturamento. Para dinheiro já registrado em outra conta do Studio, use Transferência, não Aporte.</p>');
+  const rows=await rpc('apiListRefundableContributionsV1',token);
+  if(!Array.isArray(rows))throw Error('Não foi possível consultar os saldos de aportes.');
+  financeContributions=rows;
+  renderContributionsMobile();
  }
  if(tab==='account'){
   const edit=window.mobileEditAccount||null;
@@ -865,7 +925,46 @@ async function financeAction(action,id){
   if(!confirmWrite('Transferir '+fmt(payload.valor)+' entre as contas selecionadas?'))return;
   await safeWrite(()=>rpc('apiTransferFinancialV172',token,payload),'Transferência registrada sem alterar o resultado financeiro.',async()=>{await refreshBank();await selectFinanceTab('transfer')});return;
  }
+ if(action==='openContributionNonRefundable'||action==='openContributionRefundable'){
+  contributionFormType=action==='openContributionRefundable'?'refundable':'non';
+  contributionReturnId='';
+  renderContributionsMobile();return;
+ }
+ if(action==='openContributionReturn'){
+  const a=financeContributions.find(x=>String(x.id)===String(id));
+  if(!a||Number(a.saldo||0)<=0)throw Error('Aporte sem saldo disponível para devolução.');
+  contributionFormType='return';contributionReturnId=a.id;
+  renderContributionsMobile();return;
+ }
+ if(action==='cancelContributionForm'){
+  contributionFormType='';contributionReturnId='';renderContributionsMobile();return;
+ }
+ if(action==='saveRefundableContribution'||action==='saveContributionReturn'){
+  const isReturn=action==='saveContributionReturn';
+  const a=isReturn?financeContributions.find(x=>String(x.id)===String(contributionReturnId)):null;
+  if(isReturn&&(!a||Number(a.saldo||0)<=0))throw Error('Aporte sem saldo disponível.');
+  const date=contributionDate(gv(isReturn?'returnConDate':'conDate'));
+  const account=gv(isReturn?'returnConAccount':'conAccount');
+  const value=finitePositive(moneyInput(isReturn?'returnConValue':'conValue'),isReturn?'a devolução':'o aporte');
+  if(!account)throw Error('Selecione a conta financeira.');
+  if(isReturn&&date<String(a.data||''))throw Error('A devolução não pode anteceder a data do aporte.');
+  if(isReturn&&value>Number(a.saldo||0)+0.001)throw Error('A devolução excede o saldo do aporte.');
+  const payload={data:date,conta_financeira_id:account,valor:value,
+   descricao:gv(isReturn?'returnConDesc':'conDesc')};
+  if(isReturn)payload.aporte_id=a.id;
+  else {payload.titular=gv('conOwner');if(payload.titular.length<2)throw Error('Informe quem realizou o aporte.');}
+  const label=isReturn?'Devolver '+fmt(value)+' do aporte de '+a.titular:'Registrar aporte reembolsável de '+fmt(value)+' para '+payload.titular;
+  if(!confirmWrite(label+'? Esta operação movimentará a conta financeira selecionada.'))return;
+  await safeWrite(async()=>{
+   const result=await rpc('apiOperateRefundableContributionV1',token,isReturn?'DEVOLVER':'CRIAR',payload);
+   if(result?.ok===false)throw Error(result.error||'Operação não realizada.');
+  },isReturn?'Devolução registrada. Saldo atualizado.':'Aporte reembolsável registrado.',async()=>{
+   contributionFormType='';contributionReturnId='';
+   await refreshBank();await selectFinanceTab('contrib');
+  });return;
+ }
  if(action==='saveContribution'){
+  contributionDate(gv('conDate'));
   const payload={data:gv('conDate'),conta_financeira_id:gv('conAccount'),valor:finitePositive(moneyInput('conValue'),'o aporte'),descricao:gv('conDesc')};
   if(!payload.data||!payload.conta_financeira_id)throw Error('Informe a conta e a data.');
   if(!confirmWrite('Registrar aporte de '+fmt(payload.valor)+'?'))return;
