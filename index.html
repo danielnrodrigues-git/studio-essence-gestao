@@ -2682,7 +2682,7 @@ window.payExpense=async function(id){
   const row=entries.find(x=>String(x.id)===String(id));
   if(!row)throw Error('Parcela não encontrada.');
   const d=await gs('apiGetExpense',STATE.token,row.despesa_id);
-  let account=d.conta_financeira_id||'';
+  let account=d.parcels?.find(p=>String(p.id)===String(id))?.conta_financeira_id||d.conta_financeira_id||'';
   if(!account&&!expenseIsCard(d.forma_pagamento)){
     const options=(bootstrap.accounts||[]).filter(x=>x.ativo!==false&&x.ativo!=='false'&&['BANCO','CAIXA','CARTEIRA'].includes(String(x.tipo||'')));
     if(!options.length)throw Error('Nenhuma conta ativa para pagamento.');
@@ -2701,5 +2701,90 @@ window.payExpense=async function(id){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensureFields);
 else ensureFields();
 })();
-</script></body>
+</script>
+<script id="studio-expense-parcel-account-v22">
+(function(){
+ 'use strict';
+ const dom=id=>document.getElementById(id);
+ const rpc=(fn,...args)=>window.__studioMigrationBridge.rpc(fn,args);
+ const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ const date=v=>{const s=String(v||'').slice(0,10).split('-');return s.length===3?s.reverse().join('/'):String(v||'')};
+ const notify=message=>{if(typeof toast==='function')toast(message);else alert(message)};
+ let currentExpenseId='',opening=0;
+ const baseEdit=window.editExpense;
+ if(typeof baseEdit==='function'){
+  window.editExpense=async function(id){
+   const seq=++opening;
+   await baseEdit.apply(this,arguments);
+   if(seq!==opening||!dom('expenseEditModal')||!dom('editExpId'))return;
+   currentExpenseId=String(id);
+   let root=dom('expenseParcelAccountsV22');
+   if(!root){
+    root=document.createElement('div');root.id='expenseParcelAccountsV22';
+    root.className='studio-expense-parcel-accounts';
+    const anchor=dom('editExpAccountV21')?.closest('.field');
+    if(anchor)anchor.insertAdjacentElement('afterend',root);
+    else dom('expenseEditModal').querySelector('.form-grid')?.appendChild(root);
+   }
+   root.innerHTML='<div class="muted tiny">Carregando contas das parcelas...</div>';
+   try{
+    const [expense,bootstrap]=await Promise.all([
+      rpc('apiGetExpense',STATE.token,String(id)),
+      rpc('apiFinancialBootstrapV172',STATE.token)
+    ]);
+    if(seq!==opening||currentExpenseId!==String(id))return;
+    const available=(bootstrap.accounts||[]).filter(a=>a.ativo!==false&&a.ativo!=='false'&&!['RECEBIVEIS','TRANSITORIA'].includes(String(a.tipo||''))&&a.id!=='CF-LEGADO');
+    const pending=(expense.parcels||[]).filter(p=>String(p.status).toUpperCase()==='PREVISTO');
+    root.replaceChildren();
+    const heading=document.createElement('h4');heading.textContent='Conta financeira por parcela';root.appendChild(heading);
+    const intro=document.createElement('p');intro.className='tiny muted';intro.textContent='As parcelas não pagas podem ter sua conta alterada até a confirmação do pagamento. Parcelas já pagas permanecem protegidas.';root.appendChild(intro);
+    if(!pending.length){const message=document.createElement('p');message.textContent='Não há parcelas pendentes para alterar.';root.appendChild(message);return}
+    const selectRows=[];
+    pending.forEach(p=>{
+      const field=document.createElement('div');field.className='field';
+      const label=document.createElement('label');label.textContent='Parcela '+(expense.parcels.indexOf(p)+1)+'/'+expense.parcels.length+' — '+date(p.vencimento)+' — '+money(p.valor);field.appendChild(label);
+      const select=document.createElement('select');select.appendChild(new Option('Selecionar no pagamento',''));
+      available.forEach(a=>select.appendChild(new Option(a.nome,a.id)));
+      const original=String(p.conta_financeira_id||'');
+      select.value=[...select.options].some(o=>o.value===original)?original:'';
+      field.appendChild(select);root.appendChild(field);selectRows.push({id:p.id,select,original});
+    });
+    const btn=document.createElement('button');btn.type='button';btn.className='btn primary';btn.textContent='Salvar contas das parcelas pendentes';
+    btn.addEventListener('click',async()=>{
+      btn.disabled=true;
+      try{
+       const changed=selectRows.filter(x=>x.select.value!==x.original);
+       for(const entry of changed){
+         await rpc('apiSetExpenseParcelAccountV21',STATE.token,entry.id,entry.select.value);
+         entry.original=entry.select.value;
+       }
+       notify(changed.length?'Conta(s) das parcelas atualizada(s).':'Nenhuma alteração de conta.');
+       if(typeof loadExpenses==='function')await loadExpenses();
+      }catch(err){if(typeof uiAlertV153HF1==='function')uiAlertV153HF1(err.message);else alert(err.message)}
+      finally{btn.disabled=false}
+    });
+    root.appendChild(btn);
+    if(expense.has_paid){
+     const global=dom('editExpAccountV21');if(global)global.disabled=true;
+    }
+   }catch(err){root.textContent='Não foi possível carregar as contas por parcela: '+err.message}
+  };
+ }
+ function searchHint(){
+  const input=dom('expFilterDesc');if(!input)return;
+  if(dom('expenseSearchHintV22'))return;
+  const hint=document.createElement('div');hint.id='expenseSearchHintV22';hint.className='tiny muted';hint.textContent='Ao buscar por descrição, o sistema considera todos os vencimentos, inclusive outros meses.';
+  input.parentElement?.appendChild(hint);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',searchHint);else searchHint();
+})();
+</script>
+<style id="studio-expense-parcel-account-v22-css">
+.studio-expense-parcel-accounts{grid-column:1/-1;padding:14px 0;border-top:1px solid var(--line,#ddd);margin-top:12px}
+.studio-expense-parcel-accounts h4{margin:0 0 6px;font-size:15px}
+.studio-expense-parcel-accounts p{margin:4px 0 12px}
+.studio-expense-parcel-accounts .field{margin:10px 0}
+.studio-expense-parcel-accounts .field select{width:100%}
+</style>
+</body>
 </html>
