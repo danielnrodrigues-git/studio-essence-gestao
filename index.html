@@ -2827,7 +2827,7 @@ else ensureFields();
    if(savedFocus&&savedFocus.isConnected)savedFocus.focus();
  }
  window.editFinancialAccountV172=function(id){
-  const a=(window.STATE?.financialBootstrapV172?.accounts||[]).find(x=>String(x.id)===String(id));
+  const a=(STATE.financialBootstrapV172?.accounts||[]).find(x=>String(x.id)===String(id));
   if(!a){alert('Conta financeira não encontrada. Atualize a tela e tente novamente.');return}
   savedFocus=document.activeElement;
   let overlay=get('studioFinAccountOverlayV23');
@@ -2881,7 +2881,7 @@ else ensureFields();
       transitoria:val('transit')==='true',permite_conciliacao:val('reconcile')==='true'};
     save.disabled=true;save.textContent='Salvando...';
     try{
-      await window.__studioMigrationBridge.rpc('apiSaveFinancialAccountV172',[window.STATE.token,payload]);
+      await window.__studioMigrationBridge.rpc('apiSaveFinancialAccountV172',[STATE.token,payload]);
       close();
       if(typeof window.loadBankingV172==='function')await window.loadBankingV172();
       if(typeof window.refreshData==='function')await window.refreshData();
