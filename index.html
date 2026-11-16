@@ -2570,5 +2570,136 @@ tr.appendChild(td);body.appendChild(tr);
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensureFields);
  else ensureFields();
 })();
+</script>
+<style id="studio-expense-account-v21-css">
+.studio-expense-account-v21 select{width:100%;max-width:100%}
+.studio-expense-account-v21 .tiny{font-size:11px;margin-top:4px}
+</style>
+<script id="studio-expense-account-v21">
+(function(){
+'use strict';
+const el=id=>document.getElementById(id);
+let bootstrap=null,token='',promise=null;
+function expenseIsCard(v){return /cr[eé]dito|cart[aã]o|diners|mastercard|visa/i.test(String(v||''))&&!/d[eé]bito/i.test(String(v||''))}
+function addField(payId,selectId){
+ const payment=el(payId),anchor=payment?.closest('.field');
+ if(!anchor||el(selectId))return;
+ const field=document.createElement('div');field.className='field studio-expense-account-v21';
+ field.innerHTML='<label for="'+selectId+'">Conta financeira de pagamento *</label><select id="'+selectId+'"><option value="">Carregando contas...</option></select><div class="tiny muted">A conta escolhida será debitada quando a despesa for paga. Em cartão de crédito, a saída ocorre na quitação da fatura.</div>';
+ anchor.insertAdjacentElement('afterend',field);
+ payment.addEventListener('change',()=>{setDefault(payId,selectId,true);updateCardHint(payId,selectId)});
+}
+function ensureFields(){addField('expPay','expAccountV21');addField('editExpPay','editExpAccountV21')}
+function updateCardHint(payId,selectId){
+ const select=el(selectId),hint=select?.parentElement?.querySelector('.tiny');
+ if(hint)hint.textContent=expenseIsCard(el(payId)?.value)?'Compra no crédito: o pagamento gera obrigação; o débito bancário ocorre na quitação da fatura.':'A conta selecionada será debitada somente quando a despesa estiver paga.';
+}
+function setDefault(payId,selectId,force){
+ const select=el(selectId);if(!select||!bootstrap)return;
+ if(!force&&select.value)return;
+ const pay=String(el(payId)?.value||'');
+ const maps=bootstrap.mappings||[];
+ const forms=bootstrap.paymentMethods||bootstrap.forms||bootstrap.formas||[];
+ const mapped=maps.find(x=>String(x.forma_nome||'')===pay)||maps.find(x=>forms.some(f=>String(f.nome)===pay&&String(f.id)===String(x.forma_id)));
+ const defaultId=mapped?.conta_financeira_id||'CF-NUBANK';
+ if([...select.options].some(x=>x.value===defaultId))select.value=defaultId;
+}
+async function accounts(){
+ ensureFields();
+ if(typeof STATE==='undefined'||!STATE.token)throw Error('Sessão não iniciada.');
+ if(token!==STATE.token){bootstrap=null;promise=null;token=STATE.token}
+ if(!bootstrap&&!promise)promise=window.__studioMigrationBridge.rpc('apiFinancialBootstrapV172',[STATE.token]).then(data=>{bootstrap=data;return data}).finally(()=>{promise=null});
+ if(promise)await promise;
+ for(const id of ['expAccountV21','editExpAccountV21']){
+   const select=el(id);if(!select)continue;
+   const prior=select.value;
+   select.innerHTML='<option value="">Selecione a conta...</option>';
+   (bootstrap.accounts||[]).filter(a=>a.ativo!==false&&a.ativo!=='false'&&!['RECEBIVEIS','TRANSITORIA'].includes(String(a.tipo||''))&&a.id!=='CF-LEGADO').forEach(a=>select.add(new Option(a.nome,a.id)));
+   if([...select.options].some(o=>o.value===prior))select.value=prior;
+ }
+ setDefault('expPay','expAccountV21',false);
+ updateCardHint('expPay','expAccountV21');
+ updateCardHint('editExpPay','editExpAccountV21');
+}
+const baseLoad=window.loadExpenses;
+if(typeof baseLoad==='function')window.loadExpenses=async function(){
+ try{await accounts()}catch(err){console.warn('Carregamento de contas de despesa:',err)}
+ return baseLoad.apply(this,arguments);
+};
+window.saveExpense=async function(){
+ try{
+  await accounts();
+  const account=el('expAccountV21')?.value||'';
+  if(!account)throw Error('Selecione a conta financeira de pagamento.');
+  await gs('apiSaveExpense',STATE.token,{
+   descricao:val('expDesc'),data_compra:val('expBuy'),vencimento:val('expDue'),categoria:val('expCat'),subcategoria:val('expSub'),
+   valor:n(val('expValue')),forma_pagamento:val('expPay'),conta_financeira_id:account,
+   parcelas:Number(val('expParcels')),status:val('expStatus'),
+   recorrente:val('expRecurring')==='true',recorrencia_meses:Number(val('expRecurringMonths')),observacoes:val('expObs')
+  });
+  toast('Despesa cadastrada com conta financeira.');
+  if(el('expAccountV21'))el('expAccountV21').value='';
+  await loadExpenses();
+ }catch(err){uiAlertV153HF1(err.message)}
+};
+window.editExpense=async function(id){
+ try{
+  await accounts();
+  const d=await gs('apiGetExpense',STATE.token,id);
+  setVal('editExpId',d.id);setVal('editExpDesc',d.descricao);setVal('editExpBuy',d.data_compra);setVal('editExpDue',d.vencimento);
+  setVal('editExpCat',d.categoria);updateExpenseSubcategories('edit',d.subcategoria);
+  setVal('editExpValue',d.valor_total);setVal('editExpPay',d.forma_pagamento);
+  setVal('editExpParcels',d.qtd_parcelas);setVal('editExpObs',d.observacoes);
+  ['editExpValue','editExpPay','editExpParcels','editExpDue'].forEach(x=>{const item=el(x);if(item)item.disabled=!!d.has_paid});
+  const account=el('editExpAccountV21');
+  if(account){
+    account.value=d.conta_financeira_id||'';
+    if(!account.value&&!d.has_paid)setDefault('editExpPay','editExpAccountV21',true);
+    account.disabled=!!d.has_paid;
+  }
+  el('editExpPaidWarning')?.classList.toggle('hidden',!d.has_paid);
+  el('expenseEditModal')?.classList.remove('hidden');
+ }catch(err){uiAlertV153HF1(err.message)}
+};
+window.saveExpenseEdit=async function(){
+ try{
+  await accounts();
+  const selected=el('editExpAccountV21')?.value||'';
+  if(!selected&&!el('editExpAccountV21')?.disabled)throw Error('Selecione a conta financeira de pagamento.');
+  await gs('apiUpdateExpense',STATE.token,{
+   id:val('editExpId'),descricao:val('editExpDesc'),data_compra:val('editExpBuy'),vencimento:val('editExpDue'),
+   categoria:val('editExpCat'),subcategoria:val('editExpSub'),valor_total:n(val('editExpValue')),
+   forma_pagamento:val('editExpPay'),conta_financeira_id:selected||null,
+   qtd_parcelas:Number(val('editExpParcels')),observacoes:val('editExpObs')
+  });
+  closeExpenseEdit();toast('Despesa atualizada.');await loadExpenses();
+ }catch(err){uiAlertV153HF1(err.message)}
+};
+window.payExpense=async function(id){
+ try{
+  await accounts();
+  const entries=await gs('apiListExpenses',STATE.token,{});
+  const row=entries.find(x=>String(x.id)===String(id));
+  if(!row)throw Error('Parcela não encontrada.');
+  const d=await gs('apiGetExpense',STATE.token,row.despesa_id);
+  let account=d.conta_financeira_id||'';
+  if(!account&&!expenseIsCard(d.forma_pagamento)){
+    const options=(bootstrap.accounts||[]).filter(x=>x.ativo!==false&&x.ativo!=='false'&&['BANCO','CAIXA','CARTEIRA'].includes(String(x.tipo||'')));
+    if(!options.length)throw Error('Nenhuma conta ativa para pagamento.');
+    const menu=options.map((x,i)=>(i+1)+' - '+x.nome).join('\n');
+    const choice=await uiPromptV153HF1('Esta despesa antiga não possui conta financeira definida. Escolha a conta de débito:\n'+menu,'1',{title:'Conta de pagamento'});
+    if(choice==null)return;
+    const selected=options[Number(choice)-1];if(!selected)throw Error('Conta inválida. Operação cancelada.');
+    account=selected.id;
+  }
+  if(!await uiConfirmHF2('Confirmar pagamento hoje de '+row.descricao+' pela conta '+((bootstrap.accounts||[]).find(x=>x.id===account)?.nome||(expenseIsCard(d.forma_pagamento)?'cartão de crédito':'selecionada'))+'?'))return;
+  await gs('apiPayExpenseParcel',STATE.token,id,isoToday(),account||null);
+  toast('Parcela paga e lançada na conta financeira correta.');
+  await loadExpenses();
+ }catch(err){uiAlertV153HF1(err.message)}
+};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensureFields);
+else ensureFields();
+})();
 </script></body>
 </html>
