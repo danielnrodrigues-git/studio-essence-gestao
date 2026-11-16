@@ -2544,7 +2544,7 @@ tr.appendChild(td);body.appendChild(tr);
      if(sel){
        const exact=d.conta_financeira_id||'';
        if(exact&&[...sel.options].some(o=>o.value===exact))sel.value=exact;
-       else{sel.value='';applyDefault('editRevPay','editRevAccountV21',true)}
+       else{sel.value='';if(!d.has_received)applyDefault('editRevPay','editRevAccountV21',true)}
        sel.disabled=!!d.has_received;
        sel.title=d.has_received?'Conta bloqueada porque esta receita já foi recebida.':'';
      }
@@ -2554,7 +2554,7 @@ tr.appendChild(td);body.appendChild(tr);
    try{
      await loadAccounts();
      const account=byId('editRevAccountV21')?.value||'';
-     if(!account)throw new Error('Selecione a conta financeira da receita.');
+     if(!account&&!byId('editRevAccountV21')?.disabled)throw new Error('Selecione a conta financeira da receita.');
      await gs('apiUpdateRevenueV149',STATE.token,{
        id:val('editRevId'),descricao:val('editRevDesc'),cliente:val('editRevClient'),
        cliente_id:revenueClientIdFromNameV149(val('editRevClient')),
