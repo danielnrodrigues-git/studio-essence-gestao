@@ -2448,5 +2448,127 @@ tr.appendChild(td);body.appendChild(tr);
  }else{observer.observe(document.body,{subtree:true,childList:true});setup()}
 })();
 </script>
-</body>
+
+<style id="studio-revenue-account-v21-css">
+.studio-revenue-account-v21 label{display:block}
+.studio-revenue-account-v21 select{width:100%;max-width:100%}
+.studio-revenue-account-v21 .tiny{font-size:11px;margin-top:4px}
+</style>
+<script id="studio-revenue-account-v21">
+(function(){
+ 'use strict';
+ const byId=id=>document.getElementById(id);
+ let financialCache=null,cacheToken=null,loadingPromise=null;
+ function makeField(paymentId,accountId){
+   const payment=byId(paymentId),parent=payment?.closest('.field');
+   if(!parent||byId(accountId))return;
+   const box=document.createElement('div');
+   box.className='field studio-revenue-account-v21';
+   box.innerHTML='<label for="'+accountId+'">Conta financeira de recebimento *</label><select id="'+accountId+'" required><option value="">Carregando contas...</option></select><div class="tiny muted">Onde o dinheiro entra quando a receita for recebida.</div>';
+   parent.insertAdjacentElement('afterend',box);
+   payment.addEventListener('change',()=>{if(financialCache)applyDefault(paymentId,accountId,true)});
+ }
+ function ensureFields(){
+   makeField('revPay','revAccountV21');
+   makeField('editRevPay','editRevAccountV21');
+ }
+ function applyDefault(paymentId,accountId,force){
+   const sel=byId(accountId);
+   if(!sel||!financialCache)return;
+   if(!force&&sel.value)return;
+   const method=byId(paymentId)?.value||'';
+   const map=(financialCache.mappings||[]).find(x=>String(x.forma_id)===String(method));
+   const mapped=map?.conta_financeira_id||'';
+   if(mapped&&[...sel.options].some(o=>o.value===mapped))sel.value=mapped;
+   else if(!sel.value&&[...sel.options].some(o=>o.value==='CF-NUBANK'))sel.value='CF-NUBANK';
+ }
+ function fillOptions(id){
+   const el=byId(id);
+   if(!el||!financialCache)return;
+   const previous=el.value;
+   const accounts=(financialCache.accounts||[]).filter(a=>a.ativo!==false&&a.ativo!=='false'&&a.tipo!=='RECEBIVEIS'&&a.id!=='CF-LEGADO');
+   el.innerHTML='<option value="">Selecione a conta...</option>';
+   accounts.forEach(a=>el.add(new Option(a.nome,a.id)));
+   if(accounts.some(a=>a.id===previous))el.value=previous;
+ }
+ async function loadAccounts(){
+   ensureFields();
+   if(typeof STATE==='undefined'||!STATE.token)return;
+   if(cacheToken!==STATE.token){financialCache=null;loadingPromise=null;cacheToken=STATE.token}
+   if(!financialCache&&!loadingPromise){
+     loadingPromise=window.__studioMigrationBridge.rpc('apiFinancialBootstrapV172',[STATE.token])
+       .then(r=>{financialCache=r;return r})
+       .finally(()=>{loadingPromise=null});
+   }
+   if(loadingPromise)await loadingPromise;
+   fillOptions('revAccountV21');
+   fillOptions('editRevAccountV21');
+   applyDefault('revPay','revAccountV21',false);
+ }
+ const originalLoad=window.loadRevenuesV149;
+ if(typeof originalLoad==='function')window.loadRevenuesV149=async function(){
+   try{await loadAccounts()}catch(e){console.warn('Contas da receita:',e)}
+   return originalLoad.apply(this,arguments);
+ };
+ const originalReset=window.resetRevenueFormV149;
+ if(typeof originalReset==='function')window.resetRevenueFormV149=function(){
+   const result=originalReset.apply(this,arguments);
+   if(byId('revAccountV21')){byId('revAccountV21').value='';applyDefault('revPay','revAccountV21',true)}
+   return result;
+ };
+ window.saveRevenueV149=async function(){
+   try{
+     await loadRevenueDomainsV149();await loadAccounts();
+     const account=byId('revAccountV21')?.value||'';
+     if(!account)throw new Error('Selecione a conta financeira que receberá a receita.');
+     const payload={descricao:val('revDesc'),cliente:val('revClient'),cliente_id:revenueClientIdFromNameV149(val('revClient')),
+       data_competencia:val('revCompetence'),vencimento:val('revDue'),natureza:val('revNature'),
+       categoria_id:val('revCat'),subcategoria_id:val('revSub'),valor:n(val('revValue')),
+       forma_id:val('revPay'),conta_financeira_id:account,
+       parcelas:Number(val('revParcels')||1),status:val('revInitialStatus'),
+       recorrente:val('revRecurring')==='true',recorrencia_meses:Number(val('revRecurringMonths')||12),observacoes:val('revObs')};
+     if(!payload.categoria_id)throw new Error('Selecione a categoria da receita.');
+     await gs('apiSaveRevenueV149',STATE.token,payload);
+     toast('Receita cadastrada na conta financeira selecionada.');
+     resetRevenueFormV149();await loadRevenuesV149();
+   }catch(e){uiAlertV153HF1(e.message)}
+ };
+ const originalEdit=window.editRevenueV149;
+ if(typeof originalEdit==='function')window.editRevenueV149=async function(id){
+   try{
+     await loadAccounts();
+     await originalEdit.call(this,id);
+     const d=await gs('apiGetRevenueV149',STATE.token,id);
+     await loadAccounts();
+     const sel=byId('editRevAccountV21');
+     if(sel){
+       const exact=d.conta_financeira_id||'';
+       if(exact&&[...sel.options].some(o=>o.value===exact))sel.value=exact;
+       else{sel.value='';applyDefault('editRevPay','editRevAccountV21',true)}
+       sel.disabled=!!d.has_received;
+       sel.title=d.has_received?'Conta bloqueada porque esta receita já foi recebida.':'';
+     }
+   }catch(e){uiAlertV153HF1(e.message)}
+ };
+ window.saveRevenueEditV149=async function(){
+   try{
+     await loadAccounts();
+     const account=byId('editRevAccountV21')?.value||'';
+     if(!account)throw new Error('Selecione a conta financeira da receita.');
+     await gs('apiUpdateRevenueV149',STATE.token,{
+       id:val('editRevId'),descricao:val('editRevDesc'),cliente:val('editRevClient'),
+       cliente_id:revenueClientIdFromNameV149(val('editRevClient')),
+       data_competencia:val('editRevCompetence'),vencimento:val('editRevDue'),
+       natureza:val('editRevNature'),categoria_id:val('editRevCat'),
+       subcategoria_id:val('editRevSub'),valor_total:n(val('editRevValue')),
+       forma_id:val('editRevPay'),conta_financeira_id:account,
+       qtd_parcelas:Number(val('editRevParcels')||1),observacoes:val('editRevObs')
+     });
+     closeRevenueEditV149();toast('Receita atualizada.');await loadRevenuesV149();
+   }catch(e){uiAlertV153HF1(e.message)}
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensureFields);
+ else ensureFields();
+})();
+</script></body>
 </html>
