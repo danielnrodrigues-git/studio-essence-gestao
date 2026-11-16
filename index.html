@@ -2786,5 +2786,113 @@ else ensureFields();
 .studio-expense-parcel-accounts .field{margin:10px 0}
 .studio-expense-parcel-accounts .field select{width:100%}
 </style>
+
+<style id="studio-financial-account-edit-v23-css">
+#studioFinAccountOverlayV23{position:fixed;inset:0;background:rgba(3,32,22,.68);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px}
+#studioFinAccountOverlayV23[hidden]{display:none!important}
+#studioFinAccountOverlayV23 .studio-fin-modal{background:var(--card,#fffaf1);color:var(--ink,#173629);width:min(690px,100%);max-height:92vh;overflow:auto;border-radius:16px;box-shadow:0 24px 90px rgba(0,0,0,.25);padding:24px}
+#studioFinAccountOverlayV23 .studio-fin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+#studioFinAccountOverlayV23 h3{margin:0;color:var(--wine,#073e28)}
+#studioFinAccountOverlayV23 .studio-fin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+#studioFinAccountOverlayV23 .field{display:flex;flex-direction:column;gap:5px}
+#studioFinAccountOverlayV23 input,#studioFinAccountOverlayV23 select{width:100%;min-width:0;box-sizing:border-box}
+#studioFinAccountOverlayV23 .studio-fin-warning{padding:10px 12px;border:1px solid #e6d1ad;border-radius:10px;margin:14px 0;font-size:12px}
+#studioFinAccountOverlayV23 .studio-fin-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+@media(max-width:540px){#studioFinAccountOverlayV23 .studio-fin-grid{grid-template-columns:1fr}#studioFinAccountOverlayV23 .studio-fin-modal{padding:17px}}
+</style>
+<script id="studio-financial-account-edit-v23">
+(function(){
+ 'use strict';
+ const get=id=>document.getElementById(id);
+ const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ const readNumber=s=>{
+  const str=String(s||'').trim().replace(/[^\d,.-]/g,'');
+  if(!str)return NaN;
+  return Number(str.includes(',')?str.replace(/\./g,'').replace(',','.'):str);
+ };
+ let savedFocus=null;
+ const field=(id,label,type='text',options=null)=>{
+   const wrap=document.createElement('div');wrap.className='field';
+   const lbl=document.createElement('label');lbl.htmlFor=id;lbl.textContent=label;wrap.appendChild(lbl);
+   const input=options?document.createElement('select'):document.createElement('input');
+   input.id=id;
+   if(options)options.forEach(([value,text])=>input.add(new Option(text,value)));
+   else input.type=type;
+   wrap.appendChild(input);
+   return wrap;
+ };
+ const boolOptions=[['true','Sim'],['false','Não']];
+ function close(){
+   const overlay=get('studioFinAccountOverlayV23');if(overlay)overlay.hidden=true;
+   if(savedFocus&&savedFocus.isConnected)savedFocus.focus();
+ }
+ window.editFinancialAccountV172=function(id){
+  const a=(window.STATE?.financialBootstrapV172?.accounts||[]).find(x=>String(x.id)===String(id));
+  if(!a){alert('Conta financeira não encontrada. Atualize a tela e tente novamente.');return}
+  savedFocus=document.activeElement;
+  let overlay=get('studioFinAccountOverlayV23');
+  if(!overlay){
+    overlay=document.createElement('div');overlay.id='studioFinAccountOverlayV23';overlay.hidden=true;
+    overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+    document.body.appendChild(overlay);
+  }
+  overlay.replaceChildren();
+  const panel=document.createElement('div');panel.className='studio-fin-modal';overlay.appendChild(panel);
+  const header=document.createElement('div');header.className='studio-fin-head';panel.appendChild(header);
+  const title=document.createElement('h3');title.textContent='Editar conta financeira';header.appendChild(title);
+  const exit=document.createElement('button');exit.type='button';exit.className='btn soft small';exit.textContent='Fechar';exit.addEventListener('click',close);header.appendChild(exit);
+  const subtitle=document.createElement('p');subtitle.className='tiny muted';subtitle.textContent='Conta selecionada: '+a.nome+'. Os lançamentos financeiros existentes não serão editados.';panel.appendChild(subtitle);
+  const grid=document.createElement('div');grid.className='studio-fin-grid';panel.appendChild(grid);
+  const specs=[
+    ['name','Nome','text'],['type','Tipo','select',[['BANCO','Banco'],['CARTEIRA','Carteira'],['CAIXA','Caixa'],['TRANSITORIA','Transitória'],['RECEBIVEIS','Recebíveis'],['OUTRA','Outra']]],
+    ['institution','Instituição','text'],['opening','Saldo inicial','text'],['openingDate','Data do saldo inicial','date'],
+    ['active','Conta ativa?','select',boolOptions],['include','Consolidar saldo?','select',boolOptions],
+    ['transit','Conta transitória?','select',boolOptions],['reconcile','Permite conciliação?','select',boolOptions]
+  ];
+  specs.forEach(spec=>grid.appendChild(field('finV23_'+spec[0],spec[1],spec[2],spec[3])));
+  const set=(key,val)=>{get('finV23_'+key).value=String(val??'')};
+  set('name',a.nome);set('type',a.tipo||'BANCO');set('institution',a.instituicao||'');
+  set('opening',money(a.saldo_inicial));set('openingDate',String(a.data_saldo_inicial||'').slice(0,10));
+  set('active',String(a.ativo)!=='false');set('include',String(a.incluir_consolidado)!=='false');
+  set('transit',String(a.transitoria)==='true');set('reconcile',String(a.permite_conciliacao)!=='false');
+  const warning=document.createElement('div');warning.className='studio-fin-warning';
+  warning.textContent='Alterar o saldo inicial modifica o saldo calculado da conta, mas não cria receita, despesa ou movimentação. Confira a data de referência para não duplicar valores já registrados.';
+  panel.appendChild(warning);
+  const error=document.createElement('p');error.className='tiny';error.style.color='#a52c2c';error.setAttribute('role','alert');panel.appendChild(error);
+  const actions=document.createElement('div');actions.className='studio-fin-actions';panel.appendChild(actions);
+  const cancel=document.createElement('button');cancel.type='button';cancel.className='btn soft';cancel.textContent='Cancelar';cancel.addEventListener('click',close);actions.appendChild(cancel);
+  const save=document.createElement('button');save.type='button';save.className='btn primary';save.textContent='Salvar alterações';actions.appendChild(save);
+  save.addEventListener('click',async()=>{
+    if(save.disabled)return;
+    error.textContent='';
+    const val=key=>get('finV23_'+key).value;
+    const initial=readNumber(val('opening'));
+    if(!val('name').trim()){error.textContent='Informe o nome da conta.';return}
+    if(!Number.isFinite(initial)){error.textContent='Informe um saldo inicial válido.';return}
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(val('openingDate'))){error.textContent='Informe uma data válida para o saldo inicial.';return}
+    const delta=Math.round((initial-Number(a.saldo_inicial||0))*100)/100;
+    if(Math.abs(delta)>0.004){
+      const result=window.confirm('Alterar o saldo inicial de '+a.nome+' de '+money(a.saldo_inicial)+' para '+money(initial)+'?\n\nA diferença de '+money(delta)+' será refletida no saldo da conta, sem criar movimentações financeiras.');
+      if(!result)return;
+    }
+    const payload={id:a.id,nome:val('name').trim(),tipo:val('type'),instituicao:val('institution').trim(),saldo_inicial:initial,
+      data_saldo_inicial:val('openingDate'),ativo:val('active')==='true',incluir_consolidado:val('include')==='true',
+      transitoria:val('transit')==='true',permite_conciliacao:val('reconcile')==='true'};
+    save.disabled=true;save.textContent='Salvando...';
+    try{
+      await window.__studioMigrationBridge.rpc('apiSaveFinancialAccountV172',[window.STATE.token,payload]);
+      close();
+      if(typeof window.loadBankingV172==='function')await window.loadBankingV172();
+      if(typeof window.refreshData==='function')await window.refreshData();
+      if(typeof window.toast==='function')window.toast('Conta financeira atualizada.');
+    }catch(e){error.textContent='Não foi possível salvar: '+(e.message||e)}
+    finally{save.disabled=false;save.textContent='Salvar alterações'}
+  });
+  overlay.hidden=false;
+  get('finV23_opening').focus();
+ };
+})();
+</script>
 </body>
 </html>
